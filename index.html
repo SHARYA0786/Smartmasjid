@@ -585,7 +585,7 @@
           };
         }, []);
 
-        // Imam live ho to har 15 sec heartbeat (taaki sunne wale jaanein ki azan abhi chal rahi hai)
+        // Imam live ho to har 5 sec heartbeat (taaki sunne wale jaanein ki azan abhi chal rahi hai)
         useEffect(() => {
           if (!isImamLive || !loggedImamMasjidId) return;
           const id = setInterval(() => { azanStreamer.heartbeat(loggedImamMasjidId); setLiveBroadcasts(prev => ({ ...prev, [loggedImamMasjidId]: Date.now() })); }, 15000);
