@@ -334,8 +334,14 @@
         useEffect(() => {
           if (!window.L || !elRef.current || mapRef.current) return;
           const L = window.L;
-          const map = L.map(elRef.current).setView([lat, lng], 16);
-          L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', { maxZoom: 19, attribution: 'Tiles © Esri — Satellite' }).addTo(map);
+          const map = L.map(elRef.current, { maxZoom: 20 }).setView([lat, lng], 17);
+          const googleHybrid = L.tileLayer('https://{s}.google.com/vt/lyrs=y&x={x}&y={y}&z={z}', {
+            maxZoom: 20,
+            subdomains: ['mt0', 'mt1', 'mt2', 'mt3'],
+            attribution: 'Google Maps'
+          });
+          googleHybrid.addTo(map);
+          map.setMaxZoom(20);
           const icon = L.divIcon({ html: '<div style="font-size:32px;line-height:32px;margin-top:-30px;margin-left:-16px">📍</div>', className: '', iconSize: [0, 0] });
           const marker = L.marker([lat, lng], { draggable: true, icon }).addTo(map);
           marker.on('dragend', () => { const q = marker.getLatLng(); onChange(q.lat, q.lng); });
@@ -347,10 +353,10 @@
         useEffect(() => {
           if (!mapRef.current || !markerRef.current) return;
           markerRef.current.setLatLng([lat, lng]);
-          if (!mapRef.current.getBounds().contains([lat, lng])) mapRef.current.setView([lat, lng], 22);
+          if (!mapRef.current.getBounds().contains([lat, lng])) mapRef.current.setView([lat, lng], 17);
         }, [lat, lng]);
         if (!window.L) return <div className="p-3 text-center text-[11px] text-rose-500 border rounded-xl">मैप लोड नहीं हुआ (इंटरनेट जाँचें)। नीचे GPS बटन से लोकेशन लगा सकते हैं।</div>;
-        return <div ref={elRef} style={{ height: 420, isolation: 'isolate' }} className="rounded-xl border overflow-hidden" />;
+        return <div ref={elRef} style={{ height: 320, isolation: 'isolate' }} className="rounded-xl border overflow-hidden shadow-inner" />;
       };
 
       const HIJRI_MONTHS = ['Muharram', 'Safar', 'Rabi al-Awwal', 'Rabi al-Thani', 'Jumada al-Awwal', 'Jumada al-Thani', 'Rajab', 'Shaban', 'Ramadan', 'Shawwal', 'Dhul Qadah', 'Dhul Hijjah'];
@@ -843,8 +849,17 @@
             </div>
           );
         };
-        const infoField = (label, key, placeholder, type) => (
-          <div><label className="text-slate-500 block mb-0.5 font-bold">{label}</label><input type={type || 'text'} value={infoDraft[key] || ''} onChange={(e) => setD(key, e.target.value)} placeholder={placeholder || ''} className="w-full p-2 border rounded-xl dark:bg-slate-700 dark:border-slate-600" /></div>
+        const infoField = (label, key, placeholder, type, isTime = false) => (
+          <div className="relative">
+            <input
+              type={type || 'text'}
+              value={infoDraft[key] || ''}
+              onChange={(e) => setD(key, e.target.value)}
+              placeholder={`${isTime ? '🕒 ' : ''}${label}${placeholder ? ` (${placeholder})` : ''}`}
+              className={`w-full p-2.5 border rounded-xl dark:bg-slate-700 dark:border-slate-600 ${isTime ? 'pl-8' : ''}`}
+            />
+            {isTime && <span className="absolute left-2.5 top-1/2 -translate-y-1/2 text-sm pointer-events-none">🕒</span>}
+          </div>
         );
 
         const handleImamChangePassword = (e) => {
@@ -937,7 +952,7 @@
                   <div className="flex-1 min-w-0 pr-1">
                     {/* Line 1: Mosque Name + Small Star Toggle without background */}
                     <div className="flex items-center gap-1.5 flex-wrap">
-                      <h1 className="font-masjid text-base sm:text-lg font-black uppercase text-amber-300 tracking-wide truncate drop-shadow-xs leading-tight">
+                      <h1 className="font-masjid text-2xl sm:text-3xl font-black uppercase text-amber-300 tracking-wide truncate drop-shadow-sm leading-tight">
                         {currentMasjid.name}
                       </h1>
                       <button
@@ -1190,79 +1205,71 @@
               <main className="px-3.5 py-3 space-y-4 flex-1 z-0 pb-24">
                 {loggedImamMasjid ? (
                   <div className="space-y-4 flex flex-col min-h-[calc(100vh-200px)]">
-                    {/* WHITE CONTAINER: 2-COLUMN GRID OF 8 PILL BUTTONS */}
-                    <div className={`${darkMode ? 'bg-slate-800 border-slate-700' : 'bg-white border-slate-200'} p-5 sm:p-6 rounded-[2rem] shadow-sm border`}>
-                      <div className="grid grid-cols-2 gap-3.5">
-                        {/* Row 1 */}
-                        <button
-                          type="button"
-                          onClick={() => { setEditPhotoUrl(loggedImamMasjid.photo); setEditLat(parseFloat(loggedImamMasjid.lat) || 28.6139); setEditLng(parseFloat(loggedImamMasjid.lng) || 77.2090); setShowEditProfileModal(true); }}
-                          className="py-3.5 px-3 rounded-3xl bg-[#eaf5ed] hover:bg-[#d8eedf] dark:bg-emerald-950/40 border border-emerald-200 dark:border-emerald-800/60 flex items-center justify-center gap-2 text-[#07382c] dark:text-emerald-300 font-extrabold text-sm shadow-xs active:scale-95 transition"
-                        >
-                          <span className="text-lg">✏️</span>
-                          <span>एडिट</span>
-                        </button>
-                        <button
-                          type="button"
-                          onClick={handleImamLogout}
-                          className="py-3.5 px-3 rounded-3xl bg-[#eaf5ed] hover:bg-[#d8eedf] dark:bg-emerald-950/40 border border-emerald-200 dark:border-emerald-800/60 flex items-center justify-center gap-2 text-[#07382c] dark:text-emerald-300 font-extrabold text-sm shadow-xs active:scale-95 transition"
-                        >
-                          <span className="text-lg">🚪</span>
-                          <span>लॉगआउट</span>
-                        </button>
-
-                        {/* Row 2 */}
-                        <button
-                          type="button"
-                          onClick={() => { setDeletePasswordInput(''); setShowDeleteSafetyModal(true); }}
-                          className="py-3.5 px-3 rounded-3xl bg-[#eaf5ed] hover:bg-[#d8eedf] dark:bg-emerald-950/40 border border-emerald-200 dark:border-emerald-800/60 flex items-center justify-center gap-2 text-[#07382c] dark:text-emerald-300 font-extrabold text-sm shadow-xs active:scale-95 transition"
-                        >
-                          <span className="text-lg">🗑️</span>
-                          <span>डिलीट</span>
-                        </button>
-                        <button
-                          type="button"
-                          onClick={openInfoEdit}
-                          className="py-3.5 px-3 rounded-3xl bg-[#eaf5ed] hover:bg-[#d8eedf] dark:bg-emerald-950/40 border border-emerald-200 dark:border-emerald-800/60 flex items-center justify-center gap-2 text-[#07382c] dark:text-emerald-300 font-extrabold text-sm shadow-xs active:scale-95 transition"
-                        >
-                          <span className="text-lg">🔲</span>
-                          <span>चंदा / QR</span>
-                        </button>
-
-                        {/* Row 3 */}
+                    {/* WHITE CONTAINER: 2-COLUMN GRID OF 8 COMPACT MOBILE ACTION BUTTONS (NO ICONS) */}
+                    <div className={`${darkMode ? 'bg-slate-800 border-slate-700' : 'bg-white border-slate-200'} p-4 sm:p-5 rounded-3xl shadow-sm border`}>
+                      <div className="grid grid-cols-2 gap-3">
+                        {/* Row 1: Namaz Time, Hadith */}
                         <button
                           type="button"
                           onClick={() => openEditTimeModal(loggedImamMasjid)}
-                          className="py-3.5 px-3 rounded-3xl bg-[#eaf5ed] hover:bg-[#d8eedf] dark:bg-emerald-950/40 border border-emerald-200 dark:border-emerald-800/60 flex items-center justify-center gap-2 text-[#07382c] dark:text-emerald-300 font-extrabold text-sm shadow-xs active:scale-95 transition"
+                          className="py-3 px-2 rounded-2xl bg-[#eaf5ed] hover:bg-[#d8eedf] active:bg-[#cbe6d4] dark:bg-emerald-950/40 dark:hover:bg-emerald-900/50 border border-emerald-200 dark:border-emerald-800/70 flex items-center justify-center text-center text-[#07382c] dark:text-emerald-200 font-bold text-[13px] sm:text-[14px] shadow-xs active:scale-95 transition min-h-[44px]"
                         >
-                          <span className="text-lg">🕒</span>
-                          <span>नमाज़ समय</span>
+                          <span>Namaz Time</span>
                         </button>
                         <button
                           type="button"
                           onClick={() => { setEditHadithText(loggedImamMasjid.dailyHadith || ''); setEditHadithRef(loggedImamMasjid.dailyHadithRef || ''); setShowEditHadithModal(true); }}
-                          className="py-3.5 px-3 rounded-3xl bg-[#eaf5ed] hover:bg-[#d8eedf] dark:bg-emerald-950/40 border border-emerald-200 dark:border-emerald-800/60 flex items-center justify-center gap-2 text-[#07382c] dark:text-emerald-300 font-extrabold text-sm shadow-xs active:scale-95 transition"
+                          className="py-3 px-2 rounded-2xl bg-[#eaf5ed] hover:bg-[#d8eedf] active:bg-[#cbe6d4] dark:bg-emerald-950/40 dark:hover:bg-emerald-900/50 border border-emerald-200 dark:border-emerald-800/70 flex items-center justify-center text-center text-[#07382c] dark:text-emerald-200 font-bold text-[13px] sm:text-[14px] shadow-xs active:scale-95 transition min-h-[44px]"
                         >
-                          <span className="text-lg">📖</span>
-                          <span>हदीस</span>
+                          <span>Hadith</span>
                         </button>
 
-                        {/* Row 4 */}
+                        {/* Row 2: Sehri / Iftar, Notice */}
                         <button
                           type="button"
                           onClick={openRamzanEdit}
-                          className="py-3.5 px-3 rounded-3xl bg-[#eaf5ed] hover:bg-[#d8eedf] dark:bg-emerald-950/40 border border-emerald-200 dark:border-emerald-800/60 flex items-center justify-center gap-2 text-[#07382c] dark:text-emerald-300 font-extrabold text-sm shadow-xs active:scale-95 transition"
+                          className="py-3 px-2 rounded-2xl bg-[#eaf5ed] hover:bg-[#d8eedf] active:bg-[#cbe6d4] dark:bg-emerald-950/40 dark:hover:bg-emerald-900/50 border border-emerald-200 dark:border-emerald-800/70 flex items-center justify-center text-center text-[#07382c] dark:text-emerald-200 font-bold text-[13px] sm:text-[14px] shadow-xs active:scale-95 transition min-h-[44px]"
                         >
-                          <span className="text-lg">🌙</span>
-                          <span>सहरी/इफ़्तार</span>
+                          <span>Sehri / Iftar</span>
                         </button>
                         <button
                           type="button"
                           onClick={() => setShowNewNoticeModal(true)}
-                          className="py-3.5 px-3 rounded-3xl bg-[#eaf5ed] hover:bg-[#d8eedf] dark:bg-emerald-950/40 border border-emerald-200 dark:border-emerald-800/60 flex items-center justify-center gap-2 text-[#07382c] dark:text-emerald-300 font-extrabold text-sm shadow-xs active:scale-95 transition"
+                          className="py-3 px-2 rounded-2xl bg-[#eaf5ed] hover:bg-[#d8eedf] active:bg-[#cbe6d4] dark:bg-emerald-950/40 dark:hover:bg-emerald-900/50 border border-emerald-200 dark:border-emerald-800/70 flex items-center justify-center text-center text-[#07382c] dark:text-emerald-200 font-bold text-[13px] sm:text-[14px] shadow-xs active:scale-95 transition min-h-[44px]"
                         >
-                          <span className="text-lg">📢</span>
-                          <span>ऐलान</span>
+                          <span>Notice</span>
+                        </button>
+
+                        {/* Row 3: About Masjid, Edit Profile */}
+                        <button
+                          type="button"
+                          onClick={openInfoEdit}
+                          className="py-3 px-2 rounded-2xl bg-[#eaf5ed] hover:bg-[#d8eedf] active:bg-[#cbe6d4] dark:bg-emerald-950/40 dark:hover:bg-emerald-900/50 border border-emerald-200 dark:border-emerald-800/70 flex items-center justify-center text-center text-[#07382c] dark:text-emerald-200 font-bold text-[13px] sm:text-[14px] shadow-xs active:scale-95 transition min-h-[44px]"
+                        >
+                          <span>About Masjid</span>
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => { setEditPhotoUrl(loggedImamMasjid.photo); setEditLat(parseFloat(loggedImamMasjid.lat) || 28.6139); setEditLng(parseFloat(loggedImamMasjid.lng) || 77.2090); setShowEditProfileModal(true); }}
+                          className="py-3 px-2 rounded-2xl bg-[#eaf5ed] hover:bg-[#d8eedf] active:bg-[#cbe6d4] dark:bg-emerald-950/40 dark:hover:bg-emerald-900/50 border border-emerald-200 dark:border-emerald-800/70 flex items-center justify-center text-center text-[#07382c] dark:text-emerald-200 font-bold text-[13px] sm:text-[14px] shadow-xs active:scale-95 transition min-h-[44px]"
+                        >
+                          <span>Edit Profile</span>
+                        </button>
+
+                        {/* Row 4: Logout, Delete Profile */}
+                        <button
+                          type="button"
+                          onClick={handleImamLogout}
+                          className="py-3 px-2 rounded-2xl bg-[#eaf5ed] hover:bg-[#d8eedf] active:bg-[#cbe6d4] dark:bg-emerald-950/40 dark:hover:bg-emerald-900/50 border border-emerald-200 dark:border-emerald-800/70 flex items-center justify-center text-center text-[#07382c] dark:text-emerald-200 font-bold text-[13px] sm:text-[14px] shadow-xs active:scale-95 transition min-h-[44px]"
+                        >
+                          <span>Logout</span>
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => { setDeletePasswordInput(''); setShowDeleteSafetyModal(true); }}
+                          className="py-3 px-2 rounded-2xl bg-[#eaf5ed] hover:bg-rose-50 active:bg-rose-100 dark:bg-emerald-950/40 dark:hover:bg-rose-950/40 border border-emerald-200 dark:border-emerald-800/70 hover:border-rose-300 dark:hover:border-rose-800 flex items-center justify-center text-center text-[#07382c] dark:text-emerald-200 hover:text-rose-700 dark:hover:text-rose-400 font-bold text-[13px] sm:text-[14px] shadow-xs active:scale-95 transition min-h-[44px]"
+                        >
+                          <span>Delete Profile</span>
                         </button>
                       </div>
                     </div>
@@ -1290,7 +1297,7 @@
                           <span className="text-xl">))</span>
                         </div>
                         <span className="text-xs font-black tracking-wide leading-tight text-center px-2">
-                          {isImamLive ? 'लाइव अज़ान बंद करें' : 'लाइव अज़ान चालू करें'}
+                          {isImamLive ? 'Stop Live Azan' : 'Start Live Azan'}
                         </span>
                       </button>
                     </div>
@@ -1317,15 +1324,15 @@
                   </div>
                 ) : (
                   <div className={`${darkMode ? 'bg-slate-800 border-slate-700' : 'bg-white border-slate-200'} p-5 rounded-3xl shadow-sm border space-y-4`}>
-                    <div className="text-center pb-1"><div className="w-14 h-14 rounded-full bg-emerald-50 dark:bg-slate-700 text-emerald-800 dark:text-emerald-300 text-3xl mx-auto flex justify-center items-center">👳</div><h3 className="font-black text-sm mt-2">इमाम साहब लॉगिन</h3></div>
+                    <div className="text-center pb-1"><div className="w-14 h-14 rounded-full bg-emerald-50 dark:bg-slate-700 text-emerald-800 dark:text-emerald-300 text-3xl mx-auto flex justify-center items-center">👳</div><h3 className="font-black text-sm mt-2">Imam Login</h3></div>
                     <form onSubmit={(e) => { e.preventDefault(); handleExecuteImamLogin(loginMasjidId, loginPasscode); }} className="space-y-3 text-xs">
-                      <div><label className="font-extrabold block mb-1">🔑 मस्जिद ID *</label><input type="text" value={loginMasjidId} onChange={(e) => { setLoginMasjidId(e.target.value); setLoginError(false); }} required className="w-full p-2.5 border rounded-2xl uppercase font-bold dark:bg-slate-700 dark:border-slate-600" /></div>
-                      <div><label className="font-extrabold block mb-1">🔒 पासवर्ड *</label><input type="password" value={loginPasscode} onChange={(e) => { setLoginPasscode(e.target.value); setLoginError(false); }} required className="w-full p-2.5 border rounded-2xl font-bold dark:bg-slate-700 dark:border-slate-600" /></div>
-                      {loginError && <div className="p-2 bg-rose-50 dark:bg-rose-900/30 border border-rose-200 dark:border-rose-800 rounded-xl text-rose-700 dark:text-rose-400 font-bold"><p>⚠️ गलत ID या पासवर्ड!</p><button type="button" onClick={() => setShowForgotCredentialsModal(true)} className="underline text-[11px] mt-1">👉 ID खोजें या पासवर्ड रीसेट करें</button></div>}
-                      <button type="submit" className="w-full py-3 bg-[#07382c] text-white font-extrabold rounded-2xl text-xs">🔐 लॉगिन करें</button>
-                      <div className="text-center pt-1"><button type="button" onClick={() => setShowForgotCredentialsModal(true)} className="text-emerald-700 dark:text-emerald-400 font-extrabold text-[11px] underline">🔑 ID या पासवर्ड भूल गए?</button></div>
+                      <div><input type="text" value={loginMasjidId} onChange={(e) => { setLoginMasjidId(e.target.value); setLoginError(false); }} placeholder="Mosque ID (e.g. MASJID-101) *" required className="w-full p-2.5 border rounded-2xl uppercase font-bold dark:bg-slate-700 dark:border-slate-600" /></div>
+                      <div><input type="password" value={loginPasscode} onChange={(e) => { setLoginPasscode(e.target.value); setLoginError(false); }} placeholder="Password (e.g. 786) *" required className="w-full p-2.5 border rounded-2xl font-bold dark:bg-slate-700 dark:border-slate-600" /></div>
+                      {loginError && <div className="p-2 bg-rose-50 dark:bg-rose-900/30 border border-rose-200 dark:border-rose-800 rounded-xl text-rose-700 dark:text-rose-400 font-bold"><p>⚠️ Invalid Mosque ID or Password!</p><button type="button" onClick={() => setShowForgotCredentialsModal(true)} className="underline text-[11px] mt-1">👉 Find ID or Reset Password</button></div>}
+                      <button type="submit" className="w-full py-3 bg-[#07382c] text-white font-extrabold rounded-2xl text-xs">🔐 Login</button>
+                      <div className="text-center pt-1"><button type="button" onClick={() => setShowForgotCredentialsModal(true)} className="text-emerald-700 dark:text-emerald-400 font-extrabold text-[11px] underline">🔑 Forgot Mosque ID or Password?</button></div>
                     </form>
-                    <div className="pt-2 border-t dark:border-slate-700 text-center space-y-2"><p className="text-[11px] text-slate-500">क्या आपकी मस्जिद रजिस्टर नहीं है?</p><button type="button" onClick={() => setShowRegisterModal(true)} className="w-full py-2.5 bg-emerald-50 dark:bg-slate-700 text-emerald-800 dark:text-emerald-300 font-bold rounded-2xl border border-emerald-200 dark:border-slate-600">➕ नई मस्जिद रजिस्टर करें</button></div>
+                    <div className="pt-2 border-t dark:border-slate-700 text-center space-y-2"><p className="text-[11px] text-slate-500">Is your mosque not registered yet?</p><button type="button" onClick={() => setShowRegisterModal(true)} className="w-full py-2.5 bg-emerald-50 dark:bg-slate-700 text-emerald-800 dark:text-emerald-300 font-bold rounded-2xl border border-emerald-200 dark:border-slate-600">➕ Register New Mosque</button></div>
                   </div>
                 )}
               </main>
@@ -1350,70 +1357,72 @@
                         {m.imamName && <><div className="text-[11px] text-slate-500">इमाम साहब</div><div className="text-base font-bold">{m.imamName}</div></>}
                         <div className="flex flex-wrap gap-2 justify-center mt-1">
                           {m.phone && <a href={`tel:${m.phone}`} className="min-h-[44px] px-5 rounded-full bg-[#07382c] text-white font-bold text-sm flex items-center gap-2"><svg className="w-4 h-4 text-amber-300" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M22 16.9v3a2 2 0 01-2.2 2 19.8 19.8 0 01-8.6-3.1 19.5 19.5 0 01-6-6A19.8 19.8 0 012.1 4.2 2 2 0 014.1 2h3a2 2 0 012 1.7c.1 1 .4 1.9.7 2.8a2 2 0 01-.5 2.1L8 10a16 16 0 006 6l1.4-1.3a2 2 0 012.1-.4c.9.3 1.8.6 2.8.7a2 2 0 011.7 2z" /></svg>{m.phone}</a>}
-                          <a href={`https://www.google.com/maps/dir/?api=1&destination=${m.lat},${m.lng}`} target="_blank" rel="noopener noreferrer" className="min-h-[44px] px-5 rounded-full bg-amber-400 text-slate-900 font-bold text-sm flex items-center">🧭 रास्ता</a>
-                          <button onClick={() => shareMasjidWhatsApp(m)} className="min-h-[44px] px-5 rounded-full bg-[#25D366] text-white font-bold text-sm flex items-center">📲 शेयर</button>
+                          <a href={`https://www.google.com/maps/dir/?api=1&destination=${m.lat},${m.lng}`} target="_blank" rel="noopener noreferrer" className="min-h-[44px] px-5 rounded-full bg-amber-400 text-slate-900 font-bold text-sm flex items-center">🧭 Directions</a>
                         </div>
                       </div>
 
-                      {inf.maktabHas === 'no' && <div className={`${card} text-[13px] text-slate-600 dark:text-slate-300`}>🏫 इस मस्जिद में मकतब नहीं है।</div>}
+                      {/* 1. MUTAWALLI / COMMITTEE DETAILS FIRST */}
+                      {(inf.committeeName || inf.committeePhone) && (
+                        <div className={`${card} flex justify-between items-center gap-3`}>
+                          <div><div className="text-[11px] text-slate-500 font-bold">Committee / Mutawalli</div><div className="font-bold text-[15px]">{inf.committeeName || '—'}</div></div>
+                          {inf.committeePhone && <a href={`tel:${inf.committeePhone}`} className="min-h-[44px] px-4 rounded-full bg-emerald-50 dark:bg-emerald-900/30 border border-emerald-200 text-emerald-900 dark:text-emerald-300 font-bold text-[13px] flex items-center">📞 {inf.committeePhone}</a>}
+                        </div>
+                      )}
+
+                      {/* 2. CHANDA (UPI) & QR CODE SECOND */}
+                      {(inf.upiQr || inf.upiId) && (
+                        <div className={`${card} flex flex-col items-center gap-2.5`}>
+                          <h3 className="font-extrabold text-[15px] text-[#07382c] dark:text-emerald-300 self-start">💝 Masjid Donation / QR (UPI)</h3>
+                          {inf.upiQr && <button onClick={() => setQrFull(inf.upiQr)} aria-label="View QR Full Screen" className="bg-white p-2 rounded-2xl border"><img src={inf.upiQr} alt="UPI QR" className="w-44 h-44 object-contain" /></button>}
+                          {inf.upiQr && <button onClick={() => setQrFull(inf.upiQr)} className="min-h-[40px] px-5 rounded-full bg-amber-400 text-slate-900 font-bold text-[13px]">🔍 View QR Full Screen</button>}
+                          {inf.upiId && (
+                            <div className="w-full flex flex-col items-center gap-2">
+                              <div className="font-mono text-[13px] break-all text-center">{inf.upiId}</div>
+                              <div className="flex gap-2 w-full">
+                                <button onClick={() => copyText(inf.upiId)} className="flex-1 min-h-[44px] rounded-xl bg-slate-100 dark:bg-slate-700 font-bold text-[13px]">📋 Copy UPI ID</button>
+                                <a href={upiLink(inf.upiId, m.name)} className="flex-1 min-h-[44px] rounded-xl bg-[#07382c] text-white font-bold text-[13px] flex items-center justify-center">Pay via UPI</a>
+                              </div>
+                            </div>
+                          )}
+                          <p className="text-[11.5px] text-amber-900 bg-amber-50 border border-amber-200 rounded-xl px-3 py-2 text-center">Please verify mosque name and receiver before sending donation.</p>
+                        </div>
+                      )}
+
+                      {/* 3. REST OF INFORMATION: MAKTAB, SPECIAL PRAYERS, FACILITIES */}
+                      {inf.maktabHas === 'no' && <div className={`${card} text-[13px] text-slate-600 dark:text-slate-300`}>🏫 No Maktab in this mosque.</div>}
                       {inf.maktabHas === 'yes' && (
                         <div className={card}>
-                          <div className="flex justify-between items-center"><h3 className="font-extrabold text-[15px] text-[#07382c] dark:text-emerald-300">🏫 मकतब</h3><span className="text-[11px] font-bold bg-emerald-100 text-emerald-900 px-2.5 py-1 rounded-full">मकतब है</span></div>
+                          <div className="flex justify-between items-center"><h3 className="font-extrabold text-[15px] text-[#07382c] dark:text-emerald-300">🏫 Maktab</h3><span className="text-[11px] font-bold bg-emerald-100 text-emerald-900 px-2.5 py-1 rounded-full">Available</span></div>
                           <div className="space-y-2 mt-2.5">
-                            <InfoRow label="समय" value={inf.maktabTime} />
-                            <InfoRow label="फीस" value={inf.maktabFee} />
-                            <InfoRow label="क्लासें" value={inf.maktabClasses} />
-                            <InfoRow label="उस्ताद" value={inf.ustaadName} />
+                            <InfoRow label="Timing" value={inf.maktabTime} />
+                            <InfoRow label="Fee" value={inf.maktabFee} />
+                            <InfoRow label="Classes" value={inf.maktabClasses} />
+                            <InfoRow label="Teacher" value={inf.ustaadName} />
                           </div>
-                          {inf.ustaadPhone && <a href={`tel:${inf.ustaadPhone}`} className="mt-2.5 min-h-[40px] px-4 rounded-full bg-emerald-50 dark:bg-emerald-900/30 border border-emerald-200 text-emerald-900 dark:text-emerald-300 font-bold text-[13px] inline-flex items-center">📞 उस्ताद को कॉल: {inf.ustaadPhone}</a>}
+                          {inf.ustaadPhone && <a href={`tel:${inf.ustaadPhone}`} className="mt-2.5 min-h-[40px] px-4 rounded-full bg-emerald-50 dark:bg-emerald-900/30 border border-emerald-200 text-emerald-900 dark:text-emerald-300 font-bold text-[13px] inline-flex items-center">📞 Call Teacher: {inf.ustaadPhone}</a>}
                         </div>
                       )}
 
                       {(inf.jumaKhutba || inf.eidTime || inf.taraweeh) && (
                         <div className={card}>
-                          <h3 className="font-extrabold text-[15px] text-[#07382c] dark:text-emerald-300">🕌 ख़ास नमाज़ें</h3>
+                          <h3 className="font-extrabold text-[15px] text-[#07382c] dark:text-emerald-300">🕌 Special Prayers</h3>
                           <div className="space-y-2 mt-2.5">
-                            <InfoRow label="जुमा ख़ुत्बा" value={inf.jumaKhutba} />
-                            <InfoRow label="ईद की नमाज़" value={inf.eidTime} />
-                            <InfoRow label="तरावीह" value={inf.taraweeh} />
+                            <InfoRow label="Juma Khutba" value={inf.jumaKhutba} />
+                            <InfoRow label="Eid Prayer" value={inf.eidTime} />
+                            <InfoRow label="Taraweeh" value={inf.taraweeh} />
                           </div>
                         </div>
                       )}
 
                       {(inf.facilities || []).length > 0 && (
                         <div className={card}>
-                          <h3 className="font-extrabold text-[15px] text-[#07382c] dark:text-emerald-300">✅ सुविधाएं</h3>
+                          <h3 className="font-extrabold text-[15px] text-[#07382c] dark:text-emerald-300">✅ Facilities</h3>
                           <div className="flex flex-wrap gap-2 mt-2.5">{inf.facilities.map(f => <span key={f} className="text-[12px] font-semibold bg-amber-100 text-amber-900 px-3 py-1.5 rounded-full">{f}</span>)}</div>
                         </div>
                       )}
 
-                      {(inf.committeeName || inf.committeePhone) && (
-                        <div className={`${card} flex justify-between items-center gap-3`}>
-                          <div><div className="text-[11px] text-slate-500">मुतवल्ली / कमेटी</div><div className="font-bold text-[15px]">{inf.committeeName || '—'}</div></div>
-                          {inf.committeePhone && <a href={`tel:${inf.committeePhone}`} className="min-h-[44px] px-4 rounded-full bg-emerald-50 dark:bg-emerald-900/30 border border-emerald-200 text-emerald-900 dark:text-emerald-300 font-bold text-[13px] flex items-center">📞 {inf.committeePhone}</a>}
-                        </div>
-                      )}
-
-                      {(inf.upiQr || inf.upiId) && (
-                        <div className={`${card} flex flex-col items-center gap-2.5`}>
-                          <h3 className="font-extrabold text-[15px] text-[#07382c] dark:text-emerald-300 self-start">💝 चंदा (UPI)</h3>
-                          {inf.upiQr && <button onClick={() => setQrFull(inf.upiQr)} aria-label="QR बड़ा करें" className="bg-white p-2 rounded-2xl border"><img src={inf.upiQr} alt="UPI QR" className="w-44 h-44 object-contain" /></button>}
-                          {inf.upiQr && <button onClick={() => setQrFull(inf.upiQr)} className="min-h-[40px] px-5 rounded-full bg-amber-400 text-slate-900 font-bold text-[13px]">🔍 QR बड़ा करें</button>}
-                          {inf.upiId && (
-                            <div className="w-full flex flex-col items-center gap-2">
-                              <div className="font-mono text-[13px] break-all text-center">{inf.upiId}</div>
-                              <div className="flex gap-2 w-full">
-                                <button onClick={() => copyText(inf.upiId)} className="flex-1 min-h-[44px] rounded-xl bg-slate-100 dark:bg-slate-700 font-bold text-[13px]">📋 UPI ID कॉपी</button>
-                                <a href={upiLink(inf.upiId, m.name)} className="flex-1 min-h-[44px] rounded-xl bg-[#07382c] text-white font-bold text-[13px] flex items-center justify-center">UPI ऐप से दें</a>
-                              </div>
-                            </div>
-                          )}
-                          <p className="text-[11.5px] text-amber-900 bg-amber-50 border border-amber-200 rounded-xl px-3 py-2 text-center">चंदा देने से पहले मस्जिद का नाम और QR/UPI में आने वाला नाम जाँच लें।</p>
-                        </div>
-                      )}
-
                       {!anyMore && (
-                        <div className={`${card} text-center text-[12px] text-slate-500`}>इमाम ने अभी और जानकारी नहीं भरी है।{loggedImamMasjidId === m.id && <button onClick={openInfoEdit} className="block mx-auto mt-2 px-4 py-2 bg-[#07382c] text-white rounded-xl font-bold text-xs">ℹ️ जानकारी भरें</button>}</div>
+                        <div className={`${card} text-center text-[12px] text-slate-500`}>No additional information provided yet.{loggedImamMasjidId === m.id && <button onClick={openInfoEdit} className="block mx-auto mt-2 px-4 py-2 bg-[#07382c] text-white rounded-xl font-bold text-xs">ℹ️ Edit Information</button>}</div>
                       )}
                     </div>
                   );
@@ -1573,12 +1582,20 @@
             {showRamzanEditModal && loggedImamMasjid && (
               <div className="fixed inset-0 z-[200] bg-black/60 flex items-center justify-center p-4">
                 <div className={`${darkMode ? 'bg-slate-800' : 'bg-white'} rounded-3xl p-5 max-w-sm w-full space-y-3 shadow-2xl border dark:border-slate-700`}>
-                  <div className="flex justify-between border-b pb-2 dark:border-slate-700"><h3 className="font-extrabold text-sm">🌙 रोज़ाना सहरी / इफ़्तार का समय</h3><button onClick={() => setShowRamzanEditModal(false)} aria-label="बंद">✕</button></div>
+                  <div className="flex justify-between border-b pb-2 dark:border-slate-700"><h3 className="font-extrabold text-sm">🌙 Daily Sehri & Iftar Times</h3><button onClick={() => setShowRamzanEditModal(false)} aria-label="Close">✕</button></div>
                   <form onSubmit={handleSaveRamzan} className="space-y-3 text-xs">
-                    <div><label className="text-slate-500 block mb-0.5 font-bold">सहरी ख़त्म होने का समय</label><input type="time" required value={ramzanDraft.sehri} onChange={(e) => setRamzanDraft(p => ({ ...p, sehri: e.target.value }))} className="w-full p-2.5 border rounded-xl dark:bg-slate-700 dark:border-slate-600 text-base" /></div>
-                    <div><label className="text-slate-500 block mb-0.5 font-bold">इफ़्तार का समय</label><input type="time" required value={ramzanDraft.iftar} onChange={(e) => setRamzanDraft(p => ({ ...p, iftar: e.target.value }))} className="w-full p-2.5 border rounded-xl dark:bg-slate-700 dark:border-slate-600 text-base" /></div>
-                    <p className="text-[10px] text-slate-500">ये समय मुक़्तदी के होम पेज पर तारीख़ के कार्ड के नीचे दिखेगा। रोज़ाना बदल सकते हैं।</p>
-                    <div className="flex gap-2 pt-1"><button type="button" onClick={() => setShowRamzanEditModal(false)} className="w-1/2 py-2.5 bg-slate-100 dark:bg-slate-700 rounded-xl font-bold">रद्द</button><button type="submit" className="w-1/2 py-2.5 bg-[#07382c] text-white rounded-xl font-bold shadow">सेव करें</button></div>
+                    <div className="flex items-center gap-2 border rounded-xl p-2.5 dark:bg-slate-700 dark:border-slate-600 bg-white">
+                      <span className="text-lg">🕒</span>
+                      <span className="font-bold text-xs shrink-0 text-slate-600 dark:text-slate-300">Sehri End:</span>
+                      <input type="time" required value={ramzanDraft.sehri} onChange={(e) => setRamzanDraft(p => ({ ...p, sehri: e.target.value }))} className="flex-1 p-1 bg-transparent text-base font-bold outline-none" />
+                    </div>
+                    <div className="flex items-center gap-2 border rounded-xl p-2.5 dark:bg-slate-700 dark:border-slate-600 bg-white">
+                      <span className="text-lg">🕒</span>
+                      <span className="font-bold text-xs shrink-0 text-slate-600 dark:text-slate-300">Iftar Time:</span>
+                      <input type="time" required value={ramzanDraft.iftar} onChange={(e) => setRamzanDraft(p => ({ ...p, iftar: e.target.value }))} className="flex-1 p-1 bg-transparent text-base font-bold outline-none" />
+                    </div>
+                    <p className="text-[10px] text-slate-500">This timing is shown on Muqtadi's Home page under the date card.</p>
+                    <div className="flex gap-2 pt-1"><button type="button" onClick={() => setShowRamzanEditModal(false)} className="w-1/2 py-2.5 bg-slate-100 dark:bg-slate-700 rounded-xl font-bold">Cancel</button><button type="submit" className="w-1/2 py-2.5 bg-[#07382c] text-white rounded-xl font-bold shadow">Save</button></div>
                   </form>
                 </div>
               </div>
@@ -1588,7 +1605,7 @@
             {qrFull && (
               <div onClick={() => setQrFull(null)} className="fixed inset-0 z-[300] bg-black/85 flex flex-col items-center justify-center p-4 gap-3">
                 <img src={qrFull} alt="UPI QR" className="max-w-full max-h-[78vh] rounded-2xl bg-white p-3" />
-                <button className="min-h-[44px] px-6 rounded-full bg-white text-slate-900 font-bold text-sm">बंद करें</button>
+                <button className="min-h-[44px] px-6 rounded-full bg-white text-slate-900 font-bold text-sm">Close</button>
               </div>
             )}
 
@@ -1596,38 +1613,38 @@
             {showInfoEditModal && loggedImamMasjid && (
               <div className="fixed inset-0 z-[200] bg-black/60 flex items-center justify-center p-4">
                 <div className={`${darkMode ? 'bg-slate-800' : 'bg-white'} rounded-3xl p-5 max-w-sm w-full space-y-3 shadow-2xl border dark:border-slate-700 max-h-[92vh] overflow-y-auto`}>
-                  <div className="flex justify-between border-b pb-2 dark:border-slate-700"><h3 className="font-extrabold text-sm">ℹ️ जानकारी और चंदा सेट करें</h3><button onClick={() => setShowInfoEditModal(false)} aria-label="बंद">✕</button></div>
+                  <div className="flex justify-between border-b pb-2 dark:border-slate-700"><h3 className="font-extrabold text-sm">ℹ️ About Masjid & Chanda Settings</h3><button onClick={() => setShowInfoEditModal(false)} aria-label="Close">✕</button></div>
                   <form onSubmit={handleSaveInfo} className="space-y-2.5 text-xs">
-                    <p className="text-[11px] text-slate-500">जो खाना खाली रहेगा, वो मुक़्तदी को दिखेगा ही नहीं।</p>
-                    <div className="font-bold text-[#07382c] dark:text-emerald-300">🏫 मकतब</div>
-                    <select value={infoDraft.maktabHas || ''} onChange={(e) => setD('maktabHas', e.target.value)} className="w-full p-2 border rounded-xl dark:bg-slate-700 dark:border-slate-600"><option value="">— चुनें —</option><option value="yes">मकतब है</option><option value="no">मकतब नहीं है</option></select>
+                    <p className="text-[11px] text-slate-500">Fields left blank will automatically remain hidden from Muqtadis.</p>
+                    <div className="font-bold text-[#07382c] dark:text-emerald-300">🏫 Maktab</div>
+                    <select value={infoDraft.maktabHas || ''} onChange={(e) => setD('maktabHas', e.target.value)} className="w-full p-2.5 border rounded-xl dark:bg-slate-700 dark:border-slate-600 font-bold"><option value="">— Select Maktab Status —</option><option value="yes">Maktab is Available</option><option value="no">No Maktab</option></select>
                     {infoDraft.maktabHas === 'yes' && (
                       <div className="space-y-2 pl-2 border-l-2 border-emerald-200">
-                        {infoField('समय', 'maktabTime', 'जैसे: शाम 4 से 6 बजे')}
-                        {infoField('फीस', 'maktabFee', 'जैसे: ₹200 प्रति माह / मुफ़्त')}
-                        {infoField('क्लासें', 'maktabClasses', 'जैसे: नाज़रा, हिफ़्ज़, लड़कियों की अलग')}
-                        {infoField('उस्ताद का नाम', 'ustaadName', '')}
-                        {infoField('उस्ताद का मोबाइल', 'ustaadPhone', '', 'tel')}
+                        {infoField('Maktab Timing', 'maktabTime', 'e.g. 4:00 PM to 6:00 PM', 'text', true)}
+                        {infoField('Monthly Fee', 'maktabFee', 'e.g. ₹200 / Month or Free')}
+                        {infoField('Classes', 'maktabClasses', 'e.g. Nazra, Hifz, Girls Batch')}
+                        {infoField('Teacher Name', 'ustaadName', 'e.g. Hafiz Zaid')}
+                        {infoField('Teacher Phone', 'ustaadPhone', 'e.g. 9876543210', 'tel')}
                       </div>
                     )}
-                    <div className="font-bold text-[#07382c] dark:text-emerald-300 pt-1">🕌 ख़ास नमाज़ें</div>
-                    {infoField('जुमा ख़ुत्बा', 'jumaKhutba', 'जैसे: 1:15 बजे, उर्दू/हिंदी')}
-                    {infoField('ईद की नमाज़', 'eidTime', 'जैसे: 8:00 बजे')}
-                    {infoField('तरावीह', 'taraweeh', 'जैसे: 20 रकअत, 9:00 बजे')}
-                    <div className="font-bold text-[#07382c] dark:text-emerald-300 pt-1">✅ सुविधाएं</div>
+                    <div className="font-bold text-[#07382c] dark:text-emerald-300 pt-1">🕌 Special Prayers</div>
+                    {infoField('Juma Khutba Time', 'jumaKhutba', 'e.g. 1:15 PM', 'text', true)}
+                    {infoField('Eid Prayer Time', 'eidTime', 'e.g. 8:00 AM', 'text', true)}
+                    {infoField('Taraweeh Time', 'taraweeh', 'e.g. 20 Rakat, 9:00 PM', 'text', true)}
+                    <div className="font-bold text-[#07382c] dark:text-emerald-300 pt-1">✅ Facilities</div>
                     <div className="flex flex-wrap gap-2">{FACILITIES.map(f => { const on = (infoDraft.facilities || []).includes(f); return <button type="button" key={f} onClick={() => toggleFacility(f)} aria-pressed={on} className={`px-3 py-1.5 rounded-full border text-[12px] font-semibold ${on ? 'bg-emerald-600 text-white border-emerald-600' : 'bg-white dark:bg-slate-700 border-slate-300'}`}>{on ? '✓ ' : ''}{f}</button>; })}</div>
-                    <div className="font-bold text-[#07382c] dark:text-emerald-300 pt-1">👥 कमेटी / मुतवल्ली</div>
-                    {infoField('नाम', 'committeeName', '')}
-                    {infoField('मोबाइल', 'committeePhone', '', 'tel')}
-                    <div className="font-bold text-[#07382c] dark:text-emerald-300 pt-1">💝 चंदा (UPI)</div>
-                    {infoField('UPI ID (ऐच्छिक)', 'upiId', 'जैसे: masjid@upi')}
+                    <div className="font-bold text-[#07382c] dark:text-emerald-300 pt-1">👥 Committee / Mutawalli</div>
+                    {infoField('Mutawalli / Committee Name', 'committeeName', 'e.g. Janab Salim Khan')}
+                    {infoField('Mutawalli Mobile Number', 'committeePhone', 'e.g. 9876543210', 'tel')}
+                    <div className="font-bold text-[#07382c] dark:text-emerald-300 pt-1">💝 Donation (UPI)</div>
+                    {infoField('Masjid UPI ID (Optional)', 'upiId', 'e.g. masjid@upi')}
                     <div className="p-2 bg-emerald-50 dark:bg-slate-700/80 rounded-xl border border-emerald-100 dark:border-slate-600 space-y-2">
                       {infoDraft.upiQr && <img src={infoDraft.upiQr} alt="QR" className="w-32 h-32 object-contain bg-white rounded-xl border mx-auto" />}
                       <input type="file" id="qr-photo-input" accept="image/*" className="hidden" onChange={handleQrUpload} />
-                      <div className="flex gap-2 justify-center"><label htmlFor="qr-photo-input" className="px-3 py-2 bg-[#07382c] text-white text-[11px] font-bold rounded-lg cursor-pointer">📸 UPI QR की फोटो {infoDraft.upiQr ? 'बदलें' : 'डालें'}</label>{infoDraft.upiQr && <button type="button" onClick={() => setD('upiQr', '')} className="px-3 py-2 bg-rose-50 text-rose-600 border border-rose-200 text-[11px] font-bold rounded-lg">हटाएं</button>}</div>
-                      <p className="text-[10px] text-slate-500 text-center">साफ़, सीधी और पूरी QR फोटो लें (स्क्रीनशॉट सबसे अच्छा)।</p>
+                      <div className="flex gap-2 justify-center"><label htmlFor="qr-photo-input" className="px-3 py-2 bg-[#07382c] text-white text-[11px] font-bold rounded-lg cursor-pointer">📸 {infoDraft.upiQr ? 'Change UPI QR Photo' : 'Upload UPI QR Photo'}</label>{infoDraft.upiQr && <button type="button" onClick={() => setD('upiQr', '')} className="px-3 py-2 bg-rose-50 text-rose-600 border border-rose-200 text-[11px] font-bold rounded-lg">Remove</button>}</div>
+                      <p className="text-[10px] text-slate-500 text-center">Upload clear, straight QR code screenshot.</p>
                     </div>
-                    <div className="flex gap-2 pt-2"><button type="button" onClick={() => setShowInfoEditModal(false)} className="w-1/2 py-2.5 bg-slate-100 dark:bg-slate-700 rounded-xl font-bold">रद्द</button><button type="submit" className="w-1/2 py-2.5 bg-[#07382c] text-white rounded-xl font-bold shadow">सेव करें</button></div>
+                    <div className="flex gap-2 pt-2"><button type="button" onClick={() => setShowInfoEditModal(false)} className="w-1/2 py-2.5 bg-slate-100 dark:bg-slate-700 rounded-xl font-bold">Cancel</button><button type="submit" className="w-1/2 py-2.5 bg-[#07382c] text-white rounded-xl font-bold shadow">Save</button></div>
                   </form>
                 </div>
               </div>
@@ -1685,40 +1702,45 @@
             {showEditProfileModal && loggedImamMasjid && (
               <div className="fixed inset-0 z-[200] bg-black/60 flex items-center justify-center p-4">
                 <div className={`${darkMode ? 'bg-slate-800' : 'bg-white'} rounded-3xl p-5 max-w-sm w-full space-y-3 shadow-2xl border dark:border-slate-700 max-h-[92vh] overflow-y-auto`}>
-                  <div className="flex justify-between border-b pb-2 dark:border-slate-700"><h3 className="font-extrabold text-sm">✏️ मस्जिद प्रोफाइल एडिट</h3><button onClick={() => setShowEditProfileModal(false)}>✕</button></div>
-                  <form onSubmit={handleSaveProfileEdit} className="space-y-2 text-xs">
+                  <div className="flex justify-between border-b pb-2 dark:border-slate-700"><h3 className="font-extrabold text-sm">✏️ Edit Mosque Profile</h3><button onClick={() => setShowEditProfileModal(false)}>✕</button></div>
+                  <form onSubmit={handleSaveProfileEdit} className="space-y-2.5 text-xs">
                     <div className="flex items-center gap-3 p-2 bg-emerald-50 dark:bg-slate-700/80 rounded-xl border border-emerald-100 dark:border-slate-600">
                         <img src={editPhotoUrl || loggedImamMasjid.photo || 'https://images.unsplash.com/photo-1542816417-0983c9c9ad53?auto=format&fit=crop&w=800&q=80'} className="w-14 h-14 rounded-full object-cover border-2 border-emerald-500" />
                         <div>
                             <input type="file" id="edit-photo-input" accept="image/*" className="hidden" onChange={handleEditGalleryPhotoUpload} />
-                            <label htmlFor="edit-photo-input" className="px-3 py-1.5 bg-[#07382c] text-white text-[10px] font-bold rounded-lg cursor-pointer shadow-sm">📸 गैलरी से फोटो बदलें</label>
-                            {editPhotoUrl && <span className="block mt-1 text-[9px] text-emerald-600 font-bold">✓ फोटो सेलेक्टेड</span>}
+                            <label htmlFor="edit-photo-input" className="px-3 py-1.5 bg-[#07382c] text-white text-[10px] font-bold rounded-lg cursor-pointer shadow-sm">📸 Change Mosque Photo</label>
+                            {editPhotoUrl && <span className="block mt-1 text-[9px] text-emerald-600 font-bold">✓ Photo Selected</span>}
                         </div>
                     </div>
-                    <div><label className="text-slate-500 block mb-0.5 font-bold">मस्जिद का नाम</label><input name="mName" defaultValue={loggedImamMasjid?.name || ''} required className="w-full p-2 border rounded-xl dark:bg-slate-700 dark:border-slate-600" /></div>
-                    <div className="grid grid-cols-2 gap-2"><div><label className="text-slate-500 block mb-0.5 font-bold">पता</label><input name="mAddress" defaultValue={loggedImamMasjid?.address || ''} required className="w-full p-2 border rounded-xl dark:bg-slate-700 dark:border-slate-600" /></div><div><label className="text-slate-500 block mb-0.5 font-bold">शहर</label><input name="mCity" defaultValue={loggedImamMasjid?.stateLocation || ''} required className="w-full p-2 border rounded-xl dark:bg-slate-700 dark:border-slate-600" /></div></div>
-                    <div><label className="text-slate-500 block mb-0.5 font-bold">राज्य</label><input name="mState" defaultValue={loggedImamMasjid?.stateName || ''} placeholder="जैसे: उत्तर प्रदेश" className="w-full p-2 border rounded-xl dark:bg-slate-700 dark:border-slate-600" /></div>
-                    <div className="grid grid-cols-2 gap-2"><div><label className="text-slate-500 block mb-0.5 font-bold">फ़ोन नंबर</label><input name="mPhone" defaultValue={loggedImamMasjid?.phone || ''} required className="w-full p-2 border rounded-xl dark:bg-slate-700 dark:border-slate-600" /></div><div><label className="text-slate-500 block mb-0.5 font-bold">इमाम का नाम</label><input name="mImam" defaultValue={loggedImamMasjid?.imamName || ''} required className="w-full p-2 border rounded-xl dark:bg-slate-700 dark:border-slate-600" /></div></div>
+                    <div><input name="mName" defaultValue={loggedImamMasjid?.name || ''} placeholder="Mosque Name (e.g. Jama Masjid) *" required className="w-full p-2.5 border rounded-xl dark:bg-slate-700 dark:border-slate-600 font-bold" /></div>
+                    <div className="grid grid-cols-2 gap-2">
+                      <div><input name="mAddress" defaultValue={loggedImamMasjid?.address || ''} placeholder="Address / Mohalla (e.g. Mohalla Azad Nagar) *" required className="w-full p-2.5 border rounded-xl dark:bg-slate-700 dark:border-slate-600" /></div>
+                      <div><input name="mCity" defaultValue={loggedImamMasjid?.stateLocation || ''} placeholder="City (e.g. Azamgarh) *" required className="w-full p-2.5 border rounded-xl dark:bg-slate-700 dark:border-slate-600" /></div>
+                    </div>
+                    <div><input name="mState" defaultValue={loggedImamMasjid?.stateName || ''} placeholder="State (e.g. Uttar Pradesh)" className="w-full p-2.5 border rounded-xl dark:bg-slate-700 dark:border-slate-600" /></div>
+                    <div className="grid grid-cols-2 gap-2">
+                      <div><input name="mPhone" type="tel" defaultValue={loggedImamMasjid?.phone || ''} placeholder="Phone Number (e.g. 9876543210) *" required className="w-full p-2.5 border rounded-xl dark:bg-slate-700 dark:border-slate-600" /></div>
+                      <div><input name="mImam" defaultValue={loggedImamMasjid?.imamName || ''} placeholder="Imam Name (e.g. Maulana Ahmad) *" required className="w-full p-2.5 border rounded-xl dark:bg-slate-700 dark:border-slate-600" /></div>
+                    </div>
                     <div className="pt-1">
-                      <label className="text-slate-500 block mb-1 font-bold">📍 मस्जिद की लोकेशन (मैप)</label>
+                      <div className="text-slate-500 font-bold text-xs mb-1">📍 Mosque Location on Map</div>
                       <LocationPicker lat={parseFloat(editLat) || 28.6139} lng={parseFloat(editLng) || 77.2090} onChange={(a, b) => { setEditLat(a); setEditLng(b); }} />
-                      <p className="text-[10px] text-slate-500 mt-1">मैप पर टैप करें या 📍 को खींचकर सही जगह रखें।</p>
+                      <p className="text-[10px] text-slate-500 mt-1">Tap on map or drag 📍 to place on mosque roof.</p>
                       <div className="flex items-center justify-between gap-2 mt-1">
                         <span className="text-[10px] font-mono text-emerald-700">{Number(editLat).toFixed(5)}, {Number(editLng).toFixed(5)}</span>
-                        <button type="button" onClick={handleFetchEditGpsLocation} className="px-3 py-1.5 bg-emerald-50 dark:bg-emerald-900/30 text-emerald-800 dark:text-emerald-400 border border-emerald-200 dark:border-emerald-800 rounded-lg text-[11px] font-bold">📍 मेरी मौजूदा जगह लगाएं</button>
+                        <button type="button" onClick={handleFetchEditGpsLocation} className="px-3 py-1.5 bg-emerald-50 dark:bg-emerald-900/30 text-emerald-800 dark:text-emerald-400 border border-emerald-200 dark:border-emerald-800 rounded-lg text-[11px] font-bold">📍 Use My Current GPS</button>
                       </div>
                     </div>
                     <div className="pt-2 border-t dark:border-slate-700 space-y-2">
-                      <div className="font-bold text-slate-500">🔐 मस्जिद ID और पासवर्ड</div>
-                      <div><label className="text-slate-500 block mb-0.5 font-bold">मस्जिद ID (लॉगिन के लिए)</label><input name="mNewId" defaultValue={loggedImamMasjid?.id || ''} className="w-full p-2 border rounded-xl dark:bg-slate-700 dark:border-slate-600 font-mono uppercase" /></div>
+                      <div className="font-bold text-slate-500 text-xs">🔐 Login Credentials (Optional Change)</div>
+                      <div><input name="mNewId" defaultValue={loggedImamMasjid?.id || ''} placeholder="Mosque ID (e.g. MASJID-101)" className="w-full p-2.5 border rounded-xl dark:bg-slate-700 dark:border-slate-600 font-mono uppercase" /></div>
                       <div>
-                        <label className="text-slate-500 block mb-0.5 font-bold">पासवर्ड</label>
-                        <div className="flex gap-1.5"><input name="mNewPass" type={showEditPass ? 'text' : 'password'} defaultValue={loggedImamMasjid?.passcode || ''} className="flex-1 min-w-0 p-2 border rounded-xl dark:bg-slate-700 dark:border-slate-600" /><button type="button" onClick={() => setShowEditPass(!showEditPass)} aria-label="पासवर्ड दिखाएं/छुपाएं" className="px-3 rounded-xl bg-slate-100 dark:bg-slate-700 text-sm">{showEditPass ? '🙈' : '👁️'}</button></div>
+                        <div className="flex gap-1.5"><input name="mNewPass" type={showEditPass ? 'text' : 'password'} defaultValue={loggedImamMasjid?.passcode || ''} placeholder="New Password (e.g. 786)" className="flex-1 min-w-0 p-2.5 border rounded-xl dark:bg-slate-700 dark:border-slate-600" /><button type="button" onClick={() => setShowEditPass(!showEditPass)} aria-label="Show/Hide Password" className="px-3 rounded-xl bg-slate-100 dark:bg-slate-700 text-sm">{showEditPass ? '🙈' : '👁️'}</button></div>
                       </div>
-                      <div><label className="text-slate-500 block mb-0.5 font-bold">मौजूदा पासवर्ड <span className="font-normal">(ID या पासवर्ड बदलने पर ही ज़रूरी)</span></label><input name="mCurPass" type="password" autoComplete="off" placeholder="बदलना हो तभी लिखें" className="w-full p-2 border rounded-xl dark:bg-slate-700 dark:border-slate-600" /></div>
-                      <p className="text-[10px] text-amber-700 dark:text-amber-400">ID बदलने के बाद इमाम को नई ID से लॉगिन करना होगा। पुरानी ID बंद हो जाएगी।</p>
+                      <div><input name="mCurPass" type="password" autoComplete="off" placeholder="Current Password (required to change ID or Password)" className="w-full p-2.5 border rounded-xl dark:bg-slate-700 dark:border-slate-600" /></div>
+                      <p className="text-[10px] text-amber-700 dark:text-amber-400">If ID is changed, login again with new ID. Old ID will be deactivated.</p>
                     </div>
-                    <div className="flex gap-2 pt-2"><button type="button" onClick={() => setShowEditProfileModal(false)} className="w-1/2 py-2 bg-slate-100 dark:bg-slate-700 rounded-xl font-bold">रद्द</button><button type="submit" className="w-1/2 py-2 bg-[#07382c] text-white rounded-xl font-bold">सेव करें</button></div>
+                    <div className="flex gap-2 pt-2"><button type="button" onClick={() => setShowEditProfileModal(false)} className="w-1/2 py-2.5 bg-slate-100 dark:bg-slate-700 rounded-xl font-bold">Cancel</button><button type="submit" className="w-1/2 py-2.5 bg-[#07382c] text-white rounded-xl font-bold shadow">Save Profile</button></div>
                   </form>
                 </div>
               </div>
@@ -1728,11 +1750,11 @@
             {showRegisterModal && (
               <div className="fixed inset-0 z-[200] bg-black/75 flex items-center justify-center p-4">
                 <div className={`${darkMode ? 'bg-slate-800' : 'bg-white'} rounded-[2rem] p-5 max-w-sm w-full space-y-3.5 max-h-[92vh] overflow-y-auto shadow-2xl`}>
-                  <div className="flex justify-between border-b pb-2 dark:border-slate-700"><h3 className="font-black text-sm text-emerald-900 dark:text-emerald-300">नई मस्जिद रजिस्टर करें</h3><button onClick={() => setShowRegisterModal(false)}>✕</button></div>
+                  <div className="flex justify-between border-b pb-2 dark:border-slate-700"><h3 className="font-black text-sm text-emerald-900 dark:text-emerald-300">Register New Mosque</h3><button onClick={() => setShowRegisterModal(false)}>✕</button></div>
                   <form onSubmit={(e) => {
                     e.preventDefault(); const form = e.target; const id = form.mId.value.trim().toUpperCase().replace(/[^A-Z0-9_-]/g, '');
-                    if (!id) { showToast('❌ सही मस्जिद ID लिखें (अक्षर/अंक)', 'error'); return; }
-                    if (Object.keys(masjids).some(k => k.toUpperCase() === id)) { showToast('❌ ये ID पहले से मौजूद है, दूसरी ID चुनें', 'error'); return; }
+                    if (!id) { showToast('❌ Enter valid Mosque ID (Letters/Numbers)', 'error'); return; }
+                    if (Object.keys(masjids).some(k => k.toUpperCase() === id)) { showToast('❌ This ID already exists, choose another ID', 'error'); return; }
                     const finalLat = parseFloat(regLat) || userLocation.lat || 28.6139;
                     const finalLng = parseFloat(regLng) || userLocation.lng || 77.2090;
                     const newM = {
@@ -1742,22 +1764,34 @@
                     };
                     publishMasjidUpdate(newM); setSelectedMasjidId(id); setFavorites([id]); setLoggedImamMasjidId(id);
                     setUserLocation({ lat: finalLat, lng: finalLng }); setHasGps(true); safeStorageSet('mc_user_location', JSON.stringify({ lat: finalLat, lng: finalLng })); safeStorageSet('mc_logged_imam_masjid_id', id); safeStorageSet('mc_selected_masjid_id', id); safeStorageSet('mc_user_favorites', JSON.stringify([id]));
-                    setShowRegisterModal(false); setCurrentTab('profile'); showToast(`✅ रजिस्टर हो गई। ID: ${id}`);
+                    setShowRegisterModal(false); setCurrentTab('profile'); showToast(`✅ Mosque Registered! ID: ${id}`);
                   }} className="space-y-3 text-xs">
                     <div className="flex items-center gap-3 p-2 bg-emerald-50 dark:bg-slate-700/80 rounded-xl border border-emerald-100 dark:border-slate-600">
                         <img src={regPhotoUrl || 'https://images.unsplash.com/photo-1542816417-0983c9c9ad53?auto=format&fit=crop&w=800&q=80'} className="w-14 h-14 rounded-full object-cover border-2 border-emerald-500" />
-                        <div><input type="file" id="reg-photo-input" accept="image/*" className="hidden" onChange={handleGalleryPhotoUpload} /><label htmlFor="reg-photo-input" className="px-3 py-1.5 bg-[#07382c] text-white text-[10px] font-bold rounded-lg cursor-pointer shadow-sm">📸 गैलरी से फोटो चुनें</label></div>
+                        <div><input type="file" id="reg-photo-input" accept="image/*" className="hidden" onChange={handleGalleryPhotoUpload} /><label htmlFor="reg-photo-input" className="px-3 py-1.5 bg-[#07382c] text-white text-[10px] font-bold rounded-lg cursor-pointer shadow-sm">📸 Choose Photo from Gallery</label></div>
                     </div>
                     <div className="p-2 bg-emerald-50 dark:bg-slate-700/80 rounded-2xl border dark:border-slate-600">
-                      <div className="flex justify-between items-center mb-1"><span className="font-extrabold text-emerald-950 dark:text-emerald-300">📍 GPS लोकेशन</span><button type="button" onClick={()=>handleFetchGpsLocation(false)} className="px-2 py-1 bg-[#07382c] text-white rounded text-[10px]">🔄 रिफ्रेश</button></div>
-                      <div className="grid grid-cols-2 gap-2 text-[10px]"><div><label className="font-bold">Latitude:</label><input type="number" step="any" value={regLat} onChange={(e)=>setRegLat(e.target.value)} className="w-full p-1.5 border rounded dark:bg-slate-800 dark:border-slate-600" required /></div><div><label className="font-bold">Longitude:</label><input type="number" step="any" value={regLng} onChange={(e)=>setRegLng(e.target.value)} className="w-full p-1.5 border rounded dark:bg-slate-800 dark:border-slate-600" required /></div></div>
+                      <div className="flex justify-between items-center mb-1"><span className="font-extrabold text-emerald-950 dark:text-emerald-300">📍 GPS Coordinates</span><button type="button" onClick={()=>handleFetchGpsLocation(false)} className="px-2 py-1 bg-[#07382c] text-white rounded text-[10px]">🔄 Refresh GPS</button></div>
+                      <div className="grid grid-cols-2 gap-2 text-[10px]">
+                        <div><input type="number" step="any" value={regLat} onChange={(e)=>setRegLat(e.target.value)} placeholder="Latitude (e.g. 26.073)" className="w-full p-2 border rounded-xl dark:bg-slate-800 dark:border-slate-600 font-mono" required /></div>
+                        <div><input type="number" step="any" value={regLng} onChange={(e)=>setRegLng(e.target.value)} placeholder="Longitude (e.g. 83.185)" className="w-full p-2 border rounded-xl dark:bg-slate-800 dark:border-slate-600 font-mono" required /></div>
+                      </div>
                     </div>
-                    <div><label className="font-bold block mb-1">मस्जिद का नाम</label><input type="text" name="mName" placeholder="उदा: जामा मस्जिद" required className="w-full p-2.5 border rounded-2xl dark:bg-slate-700 dark:border-slate-600" /></div>
-                    <div className="grid grid-cols-2 gap-2"><div><label className="font-bold block mb-1">पता</label><input name="mAddress" placeholder="पता" required className="w-full p-2.5 border rounded-2xl dark:bg-slate-700 dark:border-slate-600" /></div><div><label className="font-bold block mb-1">शहर</label><input name="mCity" placeholder="शहर" required className="w-full p-2.5 border rounded-2xl dark:bg-slate-700 dark:border-slate-600" /></div></div>
-                    <div><label className="font-bold block mb-1">राज्य</label><input name="mState" placeholder="राज्य (जैसे: उत्तर प्रदेश)" required className="w-full p-2.5 border rounded-2xl dark:bg-slate-700 dark:border-slate-600" /></div>
-                    <div className="grid grid-cols-2 gap-2"><div><label className="font-bold block mb-1">मोबाइल नंबर</label><input name="mPhone" type="tel" placeholder="मोबाइल" required className="w-full p-2.5 border rounded-2xl dark:bg-slate-700 dark:border-slate-600" /></div><div><label className="font-bold block mb-1">इमाम का नाम</label><input name="mImam" placeholder="नाम" required className="w-full p-2.5 border rounded-2xl dark:bg-slate-700 dark:border-slate-600" /></div></div>
-                    <div className="grid grid-cols-2 gap-2"><div><label className="font-bold block mb-1 text-[10px]">मस्जिद ID *</label><input name="mId" defaultValue={'MASJID-' + Math.floor(100 + Math.random() * 900)} required className="w-full p-2 border rounded-xl font-mono font-bold uppercase dark:bg-slate-700 dark:border-slate-600" /></div><div><label className="font-bold block mb-1 text-[10px]">पासवर्ड *</label><input name="mPasscode" defaultValue="786" required className="w-full p-2 border rounded-xl font-mono font-bold dark:bg-slate-700 dark:border-slate-600" /></div></div>
-                    <div className="flex gap-2 pt-1"><button type="button" onClick={() => setShowRegisterModal(false)} className="w-1/3 py-2.5 bg-slate-100 dark:bg-slate-700 rounded-xl font-bold text-xs">रद्द</button><button type="submit" className="w-2/3 py-2.5 bg-[#07382c] text-white rounded-xl font-black text-xs">✅ रजिस्टर करें</button></div>
+                    <div><input type="text" name="mName" placeholder="Mosque Name (e.g. Jama Masjid) *" required className="w-full p-2.5 border rounded-2xl dark:bg-slate-700 dark:border-slate-600" /></div>
+                    <div className="grid grid-cols-2 gap-2">
+                      <div><input name="mAddress" placeholder="Address / Mohalla (e.g. Mohalla Azad Nagar) *" required className="w-full p-2.5 border rounded-2xl dark:bg-slate-700 dark:border-slate-600" /></div>
+                      <div><input name="mCity" placeholder="City (e.g. Azamgarh) *" required className="w-full p-2.5 border rounded-2xl dark:bg-slate-700 dark:border-slate-600" /></div>
+                    </div>
+                    <div><input name="mState" placeholder="State (e.g. Uttar Pradesh)" className="w-full p-2.5 border rounded-2xl dark:bg-slate-700 dark:border-slate-600" /></div>
+                    <div className="grid grid-cols-2 gap-2">
+                      <div><input name="mPhone" type="tel" placeholder="Mobile Number (e.g. 9876543210) *" required className="w-full p-2.5 border rounded-2xl dark:bg-slate-700 dark:border-slate-600" /></div>
+                      <div><input name="mImam" placeholder="Imam Name (e.g. Maulana Ahmad) *" required className="w-full p-2.5 border rounded-2xl dark:bg-slate-700 dark:border-slate-600" /></div>
+                    </div>
+                    <div className="grid grid-cols-2 gap-2">
+                      <div><input name="mId" defaultValue={'MASJID-' + Math.floor(100 + Math.random() * 900)} placeholder="Mosque ID (e.g. MASJID-101) *" required className="w-full p-2.5 border rounded-xl font-mono font-bold uppercase dark:bg-slate-700 dark:border-slate-600" /></div>
+                      <div><input name="mPasscode" defaultValue="786" placeholder="Password (e.g. 786) *" required className="w-full p-2.5 border rounded-xl font-mono font-bold dark:bg-slate-700 dark:border-slate-600" /></div>
+                    </div>
+                    <div className="flex gap-2 pt-1"><button type="button" onClick={() => setShowRegisterModal(false)} className="w-1/3 py-2.5 bg-slate-100 dark:bg-slate-700 rounded-xl font-bold text-xs">Cancel</button><button type="submit" className="w-2/3 py-2.5 bg-[#07382c] text-white rounded-xl font-black text-xs">✅ Register Mosque</button></div>
                   </form>
                 </div>
               </div>
@@ -1767,11 +1801,11 @@
             {showChangePasswordModal && (
                <div className="fixed inset-0 z-[200] bg-black/70 flex items-center justify-center p-4">
                   <div className={`${darkMode ? 'bg-slate-800' : 'bg-white'} rounded-3xl p-5 max-w-sm w-full space-y-3.5 border shadow-2xl dark:border-slate-700`}>
-                     <div className="flex justify-between border-b pb-2 dark:border-slate-700"><h3 className="font-extrabold text-sm">🔑 नया पासवर्ड बनाएं</h3><button onClick={() => setShowChangePasswordModal(false)}>✕</button></div>
+                     <div className="flex justify-between border-b pb-2 dark:border-slate-700"><h3 className="font-extrabold text-sm">🔑 Change Password</h3><button onClick={() => setShowChangePasswordModal(false)}>✕</button></div>
                      <form onSubmit={handleImamChangePassword} className="space-y-3 text-xs">
-                        <div><label className="font-bold block mb-1">नया पासवर्ड</label><input type="text" value={newPassword} onChange={(e) => setNewPassword(e.target.value)} className="w-full p-2 border rounded-xl font-mono dark:bg-slate-700 dark:border-slate-600" placeholder="नया पासवर्ड" required/></div>
-                        <div><label className="font-bold block mb-1">पासवर्ड दोबारा लिखें</label><input type="password" value={confirmPassword} onChange={(e) => setConfirmPassword(e.target.value)} className="w-full p-2 border rounded-xl font-mono dark:bg-slate-700 dark:border-slate-600" placeholder="दोबारा लिखें" required/></div>
-                        <div className="flex gap-2 pt-2"><button type="button" onClick={() => setShowChangePasswordModal(false)} className="w-1/2 py-2.5 bg-slate-100 dark:bg-slate-700 rounded-xl font-bold">रद्द</button><button type="submit" className="w-1/2 py-2.5 bg-[#07382c] text-white rounded-xl font-bold">बदलें</button></div>
+                        <div><input type="text" value={newPassword} onChange={(e) => setNewPassword(e.target.value)} className="w-full p-2.5 border rounded-xl font-mono dark:bg-slate-700 dark:border-slate-600" placeholder="New Password (e.g. 786) *" required/></div>
+                        <div><input type="password" value={confirmPassword} onChange={(e) => setConfirmPassword(e.target.value)} className="w-full p-2.5 border rounded-xl font-mono dark:bg-slate-700 dark:border-slate-600" placeholder="Confirm New Password *" required/></div>
+                        <div className="flex gap-2 pt-2"><button type="button" onClick={() => setShowChangePasswordModal(false)} className="w-1/2 py-2.5 bg-slate-100 dark:bg-slate-700 rounded-xl font-bold">Cancel</button><button type="submit" className="w-1/2 py-2.5 bg-[#07382c] text-white rounded-xl font-bold">Change</button></div>
                      </form>
                   </div>
                </div>
@@ -1781,20 +1815,55 @@
             {showEditTimeModal && (
               <div className="fixed inset-0 z-[200] bg-black/70 flex justify-center items-center p-3.5">
                 <div className={`${darkMode ? 'bg-slate-800' : 'bg-white'} rounded-3xl p-4 max-w-sm w-full space-y-3 shadow-2xl border max-h-[95vh] overflow-y-auto dark:border-slate-700`}>
-                  <div className="flex justify-between border-b pb-2 dark:border-slate-700"><h3 className="font-extrabold text-sm">🕒 नमाज़ समय व तारीख़ें</h3><button onClick={() => setShowEditTimeModal(false)}>✕</button></div>
+                  <div className="flex justify-between border-b pb-2 dark:border-slate-700"><h3 className="font-extrabold text-sm">🕒 Namaz Times & Dates</h3><button onClick={() => setShowEditTimeModal(false)}>✕</button></div>
                   <form onSubmit={handleSaveScheduleInstant} className="space-y-3 text-[11px]">
-                    <div className="grid grid-cols-2 gap-2"><div><label className="font-bold block mb-1">English Date</label><input value={editEnglishDate} onChange={(e) => setEditEnglishDate(e.target.value)} className="w-full p-1.5 border rounded-lg dark:bg-slate-700 dark:border-slate-600" required /></div><div><label className="font-bold block mb-1">Hijri Date</label><input value={editHijriDate} onChange={(e) => setEditHijriDate(e.target.value)} className="w-full p-1.5 border rounded-lg font-bold dark:bg-slate-700 dark:border-slate-600" required /></div></div>
-                    <div className="space-y-1">
+                    <div className="grid grid-cols-2 gap-2">
+                      <div><input value={editEnglishDate} onChange={(e) => setEditEnglishDate(e.target.value)} placeholder="English Date (e.g. Tue, Nov 03, 2026)" className="w-full p-2 border rounded-xl dark:bg-slate-700 dark:border-slate-600" required /></div>
+                      <div><input value={editHijriDate} onChange={(e) => setEditHijriDate(e.target.value)} placeholder="Hijri Date (e.g. 23 Jumada al-Awwal 1448)" className="w-full p-2 border rounded-xl font-bold dark:bg-slate-700 dark:border-slate-600" required /></div>
+                    </div>
+                    <div className="space-y-1.5">
                       {[{ key: 'fajr', label: 'Fajr', jamatKey: 'fajrJamat' },{ key: 'zuhr', label: 'Zuhr', jamatKey: 'zuhrJamat' },{ key: 'asr', label: 'Asr', jamatKey: 'asrJamat' },{ key: 'maghrib', label: 'Maghrib', jamatKey: 'maghribJamat' },{ key: 'isha', label: 'Isha', jamatKey: 'ishaJamat' }].map((p) => (
-                        <div key={p.key} className="flex justify-between items-center p-1.5 rounded-lg border bg-slate-50 dark:bg-slate-700 dark:border-slate-600"><span className="font-bold w-12">{p.label}</span><div className="flex items-center gap-1">Azan: <input type="time" value={editSchedule[p.key] || ''} onChange={(e) => setEditSchedule({ ...editSchedule, [p.key]: e.target.value })} className="p-1 border rounded w-16 dark:bg-slate-800 dark:border-slate-700" required /></div><div className="flex items-center gap-1 font-bold text-emerald-700 dark:text-emerald-400">Jamat: <input type="time" value={editSchedule[p.jamatKey] || ''} onChange={(e) => setEditSchedule({ ...editSchedule, [p.jamatKey]: e.target.value })} className="p-1 border rounded w-16 dark:bg-slate-800 dark:border-slate-700" required /></div></div>
+                        <div key={p.key} className="flex justify-between items-center p-2 rounded-xl border bg-slate-50 dark:bg-slate-700 dark:border-slate-600">
+                          <span className="font-extrabold w-14 text-xs">{p.label}</span>
+                          <div className="flex items-center gap-1">
+                            <span className="text-xs">🕒</span>
+                            <span className="text-[10px] text-slate-500">Azan:</span>
+                            <input type="time" value={editSchedule[p.key] || ''} onChange={(e) => setEditSchedule({ ...editSchedule, [p.key]: e.target.value })} className="p-1 border rounded-lg w-20 dark:bg-slate-800 dark:border-slate-700 font-bold" required />
+                          </div>
+                          <div className="flex items-center gap-1 font-bold text-emerald-700 dark:text-emerald-400">
+                            <span className="text-xs">🕒</span>
+                            <span className="text-[10px]">Jamat:</span>
+                            <input type="time" value={editSchedule[p.jamatKey] || ''} onChange={(e) => setEditSchedule({ ...editSchedule, [p.jamatKey]: e.target.value })} className="p-1 border rounded-lg w-20 dark:bg-slate-800 dark:border-slate-700 font-bold" required />
+                          </div>
+                        </div>
                       ))}
                     </div>
-                    <div className="p-2 border rounded-lg bg-amber-50 dark:bg-amber-900/10 dark:border-amber-900/30">
-                        <span className="font-bold block mb-2 text-center text-xs text-amber-900 dark:text-amber-400">अन्य समय (तुलू, ग़ुरूब व जुमा)</span>
-                        <div className="grid grid-cols-2 gap-2 mb-2"><div><label className="font-bold block mb-1">🌅 Sunrise</label><input type="time" value={editSchedule.sunrise || ''} onChange={(e) => setEditSchedule({ ...editSchedule, sunrise: e.target.value })} className="w-full p-1.5 border rounded font-bold dark:bg-slate-800 dark:border-slate-700" required /></div><div><label className="font-bold block mb-1">🌇 Sunset</label><input type="time" value={editSchedule.sunset || ''} onChange={(e) => setEditSchedule({ ...editSchedule, sunset: e.target.value })} className="w-full p-1.5 border rounded font-bold dark:bg-slate-800 dark:border-slate-700" required /></div></div>
-                        <div className="border-t pt-2 border-amber-200 dark:border-amber-900/30"><label className="font-bold block mb-1">🕌 Juma (जुमा)</label><div className="flex gap-2"><div className="w-1/2">Azan: <input type="time" value={editSchedule.jumaAzan || ''} onChange={(e) => setEditSchedule({ ...editSchedule, jumaAzan: e.target.value })} className="w-full p-1.5 border rounded mt-0.5 dark:bg-slate-800 dark:border-slate-700" required /></div><div className="w-1/2 font-bold text-emerald-700 dark:text-emerald-400">Jamat: <input type="time" value={editSchedule.jumaJamat || ''} onChange={(e) => setEditSchedule({ ...editSchedule, jumaJamat: e.target.value })} className="w-full p-1.5 border rounded mt-0.5 font-bold dark:bg-slate-800 dark:border-slate-700" required /></div></div></div>
+                    <div className="p-2.5 border rounded-2xl bg-amber-50 dark:bg-amber-900/10 dark:border-amber-900/30 space-y-2">
+                        <span className="font-bold block text-center text-xs text-amber-900 dark:text-amber-400">Sunrise, Sunset & Juma</span>
+                        <div className="grid grid-cols-2 gap-2">
+                          <div className="flex items-center gap-1 border p-1.5 rounded-xl bg-white dark:bg-slate-800">
+                            <span className="text-base">🕒 🌅</span>
+                            <input type="time" value={editSchedule.sunrise || ''} onChange={(e) => setEditSchedule({ ...editSchedule, sunrise: e.target.value })} placeholder="Sunrise" className="w-full p-1 border-0 font-bold dark:bg-slate-800" required />
+                          </div>
+                          <div className="flex items-center gap-1 border p-1.5 rounded-xl bg-white dark:bg-slate-800">
+                            <span className="text-base">🕒 🌇</span>
+                            <input type="time" value={editSchedule.sunset || ''} onChange={(e) => setEditSchedule({ ...editSchedule, sunset: e.target.value })} placeholder="Sunset" className="w-full p-1 border-0 font-bold dark:bg-slate-800" required />
+                          </div>
+                        </div>
+                        <div className="border-t pt-2 border-amber-200 dark:border-amber-900/30 flex gap-2">
+                          <div className="w-1/2 flex items-center gap-1 border p-1.5 rounded-xl bg-white dark:bg-slate-800">
+                            <span className="text-xs">🕒</span>
+                            <span className="text-[10px] text-slate-500">Juma Azan:</span>
+                            <input type="time" value={editSchedule.jumaAzan || ''} onChange={(e) => setEditSchedule({ ...editSchedule, jumaAzan: e.target.value })} className="w-full p-1 border-0 font-bold dark:bg-slate-800" required />
+                          </div>
+                          <div className="w-1/2 flex items-center gap-1 border p-1.5 rounded-xl bg-white dark:bg-slate-800 font-bold text-emerald-700 dark:text-emerald-400">
+                            <span className="text-xs">🕒</span>
+                            <span className="text-[10px]">Jamat:</span>
+                            <input type="time" value={editSchedule.jumaJamat || ''} onChange={(e) => setEditSchedule({ ...editSchedule, jumaJamat: e.target.value })} className="w-full p-1 border-0 font-bold dark:bg-slate-800" required />
+                          </div>
+                        </div>
                     </div>
-                    <div className="flex gap-2 pt-2"><button type="button" onClick={() => setShowEditTimeModal(false)} className="w-1/3 py-2 bg-slate-200 dark:bg-slate-700 rounded-xl font-bold">रद्द</button><button type="submit" className="w-2/3 py-2 bg-[#07382c] text-white rounded-xl font-bold">💾 सेव करें</button></div>
+                    <div className="flex gap-2 pt-2"><button type="button" onClick={() => setShowEditTimeModal(false)} className="w-1/3 py-2.5 bg-slate-200 dark:bg-slate-700 rounded-xl font-bold text-xs">Cancel</button><button type="submit" className="w-2/3 py-2.5 bg-[#07382c] text-white rounded-xl font-bold text-xs shadow">💾 Save Times</button></div>
                   </form>
                 </div>
               </div>
@@ -1802,17 +1871,44 @@
 
             {/* DELETE SAFETY MODAL */}
             {showDeleteSafetyModal && (
-               <div className="fixed inset-0 z-[200] bg-black/75 flex justify-center items-center p-4"><div className={`${darkMode ? 'bg-slate-800' : 'bg-white'} rounded-3xl p-5 max-w-sm w-full space-y-3.5 border-2 border-rose-300`}><h3 className="font-black text-rose-600 text-sm">मस्जिद डिलीट करें?</h3><input type="password" value={deletePasswordInput} onChange={(e) => setDeletePasswordInput(e.target.value)} placeholder="मस्जिद पासवर्ड दर्ज करें" className="w-full p-2 border-2 rounded-xl dark:bg-slate-700 dark:border-slate-600" /><div className="flex gap-2"><button onClick={()=>setShowDeleteSafetyModal(false)} className="w-1/2 py-2 bg-slate-100 dark:bg-slate-700 rounded-xl font-bold">रद्द</button><button onClick={executeDeleteMasjidProfile} className="w-1/2 py-2 bg-rose-600 text-white rounded-xl font-bold">🗑️ डिलीट</button></div></div></div>
+               <div className="fixed inset-0 z-[200] bg-black/75 flex justify-center items-center p-4">
+                 <div className={`${darkMode ? 'bg-slate-800' : 'bg-white'} rounded-3xl p-5 max-w-sm w-full space-y-3.5 border-2 border-rose-300`}>
+                   <h3 className="font-black text-rose-600 text-sm">Delete Mosque Profile?</h3>
+                   <input type="password" value={deletePasswordInput} onChange={(e) => setDeletePasswordInput(e.target.value)} placeholder="Enter Mosque Password to Confirm Delete" className="w-full p-2.5 border-2 rounded-xl dark:bg-slate-700 dark:border-slate-600" />
+                   <div className="flex gap-2">
+                     <button onClick={()=>setShowDeleteSafetyModal(false)} className="w-1/2 py-2.5 bg-slate-100 dark:bg-slate-700 rounded-xl font-bold text-xs">Cancel</button>
+                     <button onClick={executeDeleteMasjidProfile} className="w-1/2 py-2.5 bg-rose-600 text-white rounded-xl font-bold text-xs">🗑️ Delete</button>
+                   </div>
+                 </div>
+               </div>
             )}
             
             {/* EDIT HADITH MODAL */}
             {showEditHadithModal && (
-              <div className="fixed inset-0 z-[200] bg-black/60 flex justify-center items-center p-4"><div className={`${darkMode ? 'bg-slate-800' : 'bg-white'} rounded-3xl p-5 max-w-sm w-full space-y-3 border dark:border-slate-700`}><h3 className="font-bold text-sm">📖 आज की हदीस अपडेट करें</h3><form onSubmit={handleSaveHadithInstant} className="space-y-3 text-xs"><textarea rows={3} value={editHadithText} onChange={(e) => setEditHadithText(e.target.value)} className="w-full p-2.5 border rounded-xl dark:bg-slate-700 dark:border-slate-600 font-urdu" required /><input type="text" value={editHadithRef} onChange={(e) => setEditHadithRef(e.target.value)} placeholder="हवाला" className="w-full p-2 border rounded-xl dark:bg-slate-700 dark:border-slate-600" /><div className="flex gap-2 pt-1"><button type="button" onClick={() => setShowEditHadithModal(false)} className="w-1/2 py-2 bg-slate-100 dark:bg-slate-700 rounded-xl font-bold">रद्द</button><button type="submit" className="w-1/2 py-2 bg-[#07382c] text-white rounded-xl font-bold shadow">सेव करें</button></div></form></div></div>
+              <div className="fixed inset-0 z-[200] bg-black/60 flex justify-center items-center p-4">
+                <div className={`${darkMode ? 'bg-slate-800' : 'bg-white'} rounded-3xl p-5 max-w-sm w-full space-y-3 border dark:border-slate-700`}>
+                  <div className="flex justify-between border-b pb-2 dark:border-slate-700"><h3 className="font-bold text-sm">📖 Update Daily Hadith</h3><button onClick={() => setShowEditHadithModal(false)}>✕</button></div>
+                  <form onSubmit={handleSaveHadithInstant} className="space-y-3 text-xs">
+                    <textarea rows={3} value={editHadithText} onChange={(e) => setEditHadithText(e.target.value)} placeholder="Enter Hadith text here... (e.g. Ilm hasil karna har Musalman par farz hai) *" className="w-full p-2.5 border rounded-xl dark:bg-slate-700 dark:border-slate-600 font-urdu" required />
+                    <input type="text" value={editHadithRef} onChange={(e) => setEditHadithRef(e.target.value)} placeholder="Reference (e.g. Ibn Majah / Sahih Bukhari)" className="w-full p-2.5 border rounded-xl dark:bg-slate-700 dark:border-slate-600" />
+                    <div className="flex gap-2 pt-1"><button type="button" onClick={() => setShowEditHadithModal(false)} className="w-1/2 py-2.5 bg-slate-100 dark:bg-slate-700 rounded-xl font-bold">Cancel</button><button type="submit" className="w-1/2 py-2.5 bg-[#07382c] text-white rounded-xl font-bold shadow">Save Hadith</button></div>
+                  </form>
+                </div>
+              </div>
             )}
 
             {/* SEND NOTICE MODAL */}
             {showNewNoticeModal && (
-              <div className="fixed inset-0 z-[200] bg-black/60 flex justify-center items-center p-4"><div className={`${darkMode ? 'bg-slate-800' : 'bg-white'} rounded-3xl p-5 max-w-sm w-full space-y-3 border dark:border-slate-700`}><h3 className="font-bold text-sm">📢 नया ऐलान पोस्ट करें</h3><form onSubmit={handlePostNotice} className="space-y-2.5 text-xs"><input type="text" placeholder="ऐलान का शीर्षक" value={newNoticeTitle} onChange={(e) => setNewNoticeTitle(e.target.value)} className="w-full p-2 border rounded-xl dark:bg-slate-700 dark:border-slate-600" required /><textarea rows={3} placeholder="पूरा पैग़ाम..." value={newNoticeMessage} onChange={(e) => setNewNoticeMessage(e.target.value)} className="w-full p-2 border rounded-xl dark:bg-slate-700 dark:border-slate-600 font-urdu" required /><div className="flex gap-2"><button type="button" onClick={() => setShowNewNoticeModal(false)} className="w-1/2 py-2 bg-slate-100 dark:bg-slate-700 rounded-xl font-bold">रद्द</button><button type="submit" className="w-1/2 py-2 bg-[#07382c] text-white rounded-xl font-bold">भेजें</button></div></form></div></div>
+              <div className="fixed inset-0 z-[200] bg-black/60 flex justify-center items-center p-4">
+                <div className={`${darkMode ? 'bg-slate-800' : 'bg-white'} rounded-3xl p-5 max-w-sm w-full space-y-3 border dark:border-slate-700`}>
+                  <div className="flex justify-between border-b pb-2 dark:border-slate-700"><h3 className="font-bold text-sm">📢 Post Announcement</h3><button onClick={() => setShowNewNoticeModal(false)}>✕</button></div>
+                  <form onSubmit={handlePostNotice} className="space-y-2.5 text-xs">
+                    <input type="text" placeholder="Announcement Title (e.g. Juma Special Notice) *" value={newNoticeTitle} onChange={(e) => setNewNoticeTitle(e.target.value)} className="w-full p-2.5 border rounded-xl dark:bg-slate-700 dark:border-slate-600 font-bold" required />
+                    <textarea rows={3} placeholder="Write announcement message here... *" value={newNoticeMessage} onChange={(e) => setNewNoticeMessage(e.target.value)} className="w-full p-2.5 border rounded-xl dark:bg-slate-700 dark:border-slate-600 font-urdu" required />
+                    <div className="flex gap-2"><button type="button" onClick={() => setShowNewNoticeModal(false)} className="w-1/2 py-2.5 bg-slate-100 dark:bg-slate-700 rounded-xl font-bold">Cancel</button><button type="submit" className="w-1/2 py-2.5 bg-[#07382c] text-white rounded-xl font-bold">Send Announcement</button></div>
+                  </form>
+                </div>
+              </div>
             )}
             
           </div>
