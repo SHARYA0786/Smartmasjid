@@ -350,7 +350,7 @@
           if (!mapRef.current.getBounds().contains([lat, lng])) mapRef.current.setView([lat, lng], 16);
         }, [lat, lng]);
         if (!window.L) return <div className="p-3 text-center text-[11px] text-rose-500 border rounded-xl">मैप लोड नहीं हुआ (इंटरनेट जाँचें)। नीचे GPS बटन से लोकेशन लगा सकते हैं।</div>;
-        return <div ref={elRef} style={{ height: 210, isolation: 'isolate' }} className="rounded-xl border overflow-hidden" />;
+        return <div ref={elRef} style={{ height: 380, isolation: 'isolate' }} className="rounded-xl border overflow-hidden" />;
       };
 
       const HIJRI_MONTHS = ['Muharram', 'Safar', 'Rabi al-Awwal', 'Rabi al-Thani', 'Jumada al-Awwal', 'Jumada al-Thani', 'Rajab', 'Shaban', 'Ramadan', 'Shawwal', 'Dhul Qadah', 'Dhul Hijjah'];
