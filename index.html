@@ -347,7 +347,7 @@
         useEffect(() => {
           if (!mapRef.current || !markerRef.current) return;
           markerRef.current.setLatLng([lat, lng]);
-          if (!mapRef.current.getBounds().contains([lat, lng])) mapRef.current.setView([lat, lng], 18);
+          if (!mapRef.current.getBounds().contains([lat, lng])) mapRef.current.setView([lat, lng], 22);
         }, [lat, lng]);
         if (!window.L) return <div className="p-3 text-center text-[11px] text-rose-500 border rounded-xl">मैप लोड नहीं हुआ (इंटरनेट जाँचें)। नीचे GPS बटन से लोकेशन लगा सकते हैं।</div>;
         return <div ref={elRef} style={{ height: 420, isolation: 'isolate' }} className="rounded-xl border overflow-hidden" />;
