@@ -367,8 +367,17 @@
         </button>
       );
       const RouteButton = ({ m }) => (
-        <a href={`https://www.google.com/maps/dir/?api=1&destination=${m.lat},${m.lng}`} target="_blank" rel="noopener noreferrer" onClick={(e) => e.stopPropagation()} aria-label="Google Maps से रास्ता" className={`${pillBase} bg-gradient-to-br from-emerald-600 to-[#07382c] border-amber-300/50 text-white`}>
-          <svg className="w-[18px] h-[18px] text-amber-300" viewBox="0 0 24 24" fill="currentColor"><path d="M21.71 11.29l-9-9a1 1 0 00-1.42 0l-9 9a1 1 0 000 1.42l9 9a1 1 0 001.42 0l9-9a1 1 0 00-1.42zM14 14.5V12h-4v3H8v-4a1 1 0 011-1h5V7.5l3.5 3.5-3.5 3.5z" /></svg>
+        <a 
+          href={`https://www.google.com/maps/dir/?api=1&destination=${m.lat},${m.lng}`} 
+          target="_blank" 
+          rel="noopener noreferrer" 
+          onClick={(e) => e.stopPropagation()} 
+          aria-label="Google Maps से रास्ता" 
+          className={`${pillBase} bg-white dark:bg-slate-800 border-rose-300 dark:border-rose-800/60 text-rose-600 dark:text-rose-400 hover:bg-rose-50 active:scale-95`}
+        >
+          <svg className="w-[18px] h-[18px]" viewBox="0 0 24 24" fill="currentColor">
+            <path d="M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7zm0 9.5a2.5 2.5 0 0 1 0-5 2.5 2.5 0 0 1 0 5z"/>
+          </svg>
         </a>
       );
       const InfoRow = ({ label, value }) => (value ? <div className="flex justify-between gap-3 text-[13px]"><span className="text-slate-500 shrink-0">{label}</span><b className="text-right break-words">{value}</b></div> : null);
@@ -477,7 +486,18 @@
         useEffect(() => {
           if (!window.L || !elRef.current || mapRef.current) return;
           const L = window.L;
-          const map = L.map(elRef.current, { maxZoom: 20 }).setView([lat, lng], 17);
+          const map = L.map(elRef.current, {
+            maxZoom: 20,
+            zoomSnap: 0.25,
+            zoomDelta: 0.5,
+            wheelPxPerZoomLevel: 75,
+            wheelDebounceTime: 40,
+            zoomAnimation: true,
+            fadeAnimation: true,
+            scrollWheelZoom: true,
+            touchZoom: true,
+            bounceAtZoomLimits: true
+          }).setView([lat, lng], 17);
           const googleHybrid = L.tileLayer('https://{s}.google.com/vt/lyrs=y&x={x}&y={y}&z={z}', {
             maxZoom: 20,
             subdomains: ['mt0', 'mt1', 'mt2', 'mt3'],
@@ -499,7 +519,14 @@
           if (!mapRef.current.getBounds().contains([lat, lng])) mapRef.current.setView([lat, lng], 17);
         }, [lat, lng]);
         if (!window.L) return <div className="p-3 text-center text-[11px] text-rose-500 border rounded-xl">मैप लोड नहीं हुआ (इंटरनेट जाँचें)। नीचे GPS बटन से लोकेशन लगा सकते हैं।</div>;
-        return <div ref={elRef} style={{ height: 320, isolation: 'isolate' }} className="rounded-xl border overflow-hidden shadow-inner" />;
+        return (
+          <div className="relative">
+            <div ref={elRef} style={{ height: 260, isolation: 'isolate' }} className="rounded-xl border overflow-hidden shadow-inner" />
+            <div className="absolute top-2 right-2 z-[400] bg-black/70 text-white text-[10px] font-bold px-2 py-0.5 rounded shadow pointer-events-none">
+              🛰️ Google Satellite Map
+            </div>
+          </div>
+        );
       };
 
       const HIJRI_MONTHS = ['Muharram', 'Safar', 'Rabi al-Awwal', 'Rabi al-Thani', 'Jumada al-Awwal', 'Jumada al-Thani', 'Rajab', 'Shaban', 'Ramadan', 'Shawwal', 'Dhul Qadah', 'Dhul Hijjah'];
@@ -977,7 +1004,10 @@
             if (curPassInput !== target.passcode) { showToast('❌ ID/पासवर्ड बदलने के लिए "मौजूदा पासवर्ड" सही लिखें', 'error'); return; }
             if (passChanged && newPassClean.length < 3) { showToast('❌ पासवर्ड कम से कम 3 अक्षर का हो', 'error'); return; }
             if (idChanged) {
-              if (Object.keys(masjids).some(k => k.toUpperCase() === newIdClean)) { showToast('❌ ये ID पहले से मौजूद है, दूसरी चुनें', 'error'); return; }
+              const curIdClean = String(target.id).trim().toUpperCase();
+              const isDuplicate = Object.keys(masjids).some(k => k.trim().toUpperCase() === newIdClean && k.trim().toUpperCase() !== curIdClean) ||
+                                  Object.values(masjids).some(m => m.id && m.id.trim().toUpperCase() === newIdClean && m.id.trim().toUpperCase() !== curIdClean);
+              if (isDuplicate) { showToast('❌ यह ID पहले से किसी और मस्जिद की है! आप किसी दूसरी मस्जिद की ID नहीं रख सकते', 'error'); return; }
               if (isImamLive) { showToast('❌ पहले लाइव अज़ान बंद करें', 'error'); return; }
               if (!(mqttClient && mqttClient.connected)) { showToast('❌ ID बदलने के लिए इंटरनेट/क्लाउड कनेक्शन चाहिए', 'error'); return; }
             }
@@ -1430,51 +1460,51 @@
 
             {/* TAB 4: PROFILE */}
             {currentTab === 'profile' && (
-              <main className="px-3.5 py-3 space-y-4 flex-1 z-0 pb-24">
+              <main className={`px-3 py-2 flex-1 z-0 ${loggedImamMasjid ? 'pb-2 max-h-[calc(100dvh-130px)] overflow-hidden flex flex-col justify-between' : 'pb-24 space-y-4'}`}>
                 {loggedImamMasjid ? (
-                  <div className="space-y-3 flex flex-col min-h-[calc(100vh-200px)]">
+                  <div className="h-full flex flex-col justify-between gap-2">
                     {/* LIVE FOLLOWERS CARD FOR IMAM */}
-                    <div className={`${darkMode ? 'bg-slate-800 border-slate-700' : 'bg-gradient-to-r from-[#0c4033] to-[#07382c] border-emerald-800 text-white'} p-3.5 px-4 rounded-3xl shadow-sm border flex items-center justify-between`}>
-                      <div className="flex items-center gap-3 min-w-0">
-                        <div className="w-10 h-10 rounded-2xl bg-amber-400/20 border border-amber-300/40 flex items-center justify-center text-xl shrink-0 shadow-inner">
+                    <div className={`${darkMode ? 'bg-slate-800 border-slate-700' : 'bg-gradient-to-r from-[#0c4033] to-[#07382c] border-emerald-800 text-white'} p-2.5 px-3.5 rounded-2xl shadow-sm border flex items-center justify-between shrink-0`}>
+                      <div className="flex items-center gap-2.5 min-w-0">
+                        <div className="w-8 h-8 rounded-xl bg-amber-400/20 border border-amber-300/40 flex items-center justify-center text-base shrink-0 shadow-inner">
                           ⭐
                         </div>
                         <div className="min-w-0">
                           <div className="flex items-center gap-1.5 flex-wrap">
                             <span className="text-xs font-black tracking-wide text-amber-300">Live Followers</span>
-                            <span className="inline-flex items-center gap-1 bg-emerald-500/30 text-emerald-300 text-[9px] px-1.5 py-0.5 rounded-full font-black border border-emerald-400/30">
+                            <span className="inline-flex items-center gap-1 bg-emerald-500/30 text-emerald-300 text-[8.5px] px-1.5 py-0.5 rounded-full font-black border border-emerald-400/30">
                               <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-ping"></span>
                               LIVE
                             </span>
                           </div>
-                          <p className="text-[11px] text-white/90 truncate mt-0.5">
+                          <p className="text-[10.5px] text-white/90 truncate">
                             {(loggedImamMasjid.followersCount ?? loggedImamMasjid.favoritesCount ?? (favorites.includes(loggedImamMasjid.id) ? 1 : 0))} Muqtadi Starred this Masjid
                           </p>
                         </div>
                       </div>
                       <div className="text-right shrink-0 pl-2">
-                        <span className="text-2xl font-mono font-black text-amber-300 block leading-none">
+                        <span className="text-xl font-mono font-black text-amber-300 block leading-none">
                           {(loggedImamMasjid.followersCount ?? loggedImamMasjid.favoritesCount ?? (favorites.includes(loggedImamMasjid.id) ? 1 : 0))}
                         </span>
-                        <span className="text-[9px] font-bold text-emerald-200 block mt-1 uppercase tracking-wider">Muqtadi</span>
+                        <span className="text-[8.5px] font-bold text-emerald-200 block mt-0.5 uppercase tracking-wider">Muqtadi</span>
                       </div>
                     </div>
 
                     {/* WHITE CONTAINER: 2-COLUMN GRID OF 8 COMPACT MOBILE ACTION BUTTONS (NO ICONS) */}
-                    <div className={`${darkMode ? 'bg-slate-800 border-slate-700' : 'bg-white border-slate-200'} p-4 sm:p-5 rounded-3xl shadow-sm border`}>
-                      <div className="grid grid-cols-2 gap-3">
+                    <div className={`${darkMode ? 'bg-slate-800 border-slate-700' : 'bg-white border-slate-200'} p-3 rounded-2xl shadow-sm border shrink-0`}>
+                      <div className="grid grid-cols-2 gap-2">
                         {/* Row 1: Namaz Time, Hadith */}
                         <button
                           type="button"
                           onClick={() => openEditTimeModal(loggedImamMasjid)}
-                          className="py-3 px-2 rounded-2xl bg-[#eaf5ed] hover:bg-[#d8eedf] active:bg-[#cbe6d4] dark:bg-emerald-950/40 dark:hover:bg-emerald-900/50 border border-emerald-200 dark:border-emerald-800/70 flex items-center justify-center text-center text-[#07382c] dark:text-emerald-200 font-bold text-[13px] sm:text-[14px] shadow-xs active:scale-95 transition min-h-[44px]"
+                          className="py-2.5 px-2 rounded-xl bg-[#eaf5ed] hover:bg-[#d8eedf] active:bg-[#cbe6d4] dark:bg-emerald-950/40 dark:hover:bg-emerald-900/50 border border-emerald-200 dark:border-emerald-800/70 flex items-center justify-center text-center text-[#07382c] dark:text-emerald-200 font-bold text-xs sm:text-[13px] shadow-xs active:scale-95 transition min-h-[38px]"
                         >
                           <span>Namaz Time</span>
                         </button>
                         <button
                           type="button"
                           onClick={() => { setEditHadithText(loggedImamMasjid.dailyHadith || ''); setEditHadithRef(loggedImamMasjid.dailyHadithRef || ''); setShowEditHadithModal(true); }}
-                          className="py-3 px-2 rounded-2xl bg-[#eaf5ed] hover:bg-[#d8eedf] active:bg-[#cbe6d4] dark:bg-emerald-950/40 dark:hover:bg-emerald-900/50 border border-emerald-200 dark:border-emerald-800/70 flex items-center justify-center text-center text-[#07382c] dark:text-emerald-200 font-bold text-[13px] sm:text-[14px] shadow-xs active:scale-95 transition min-h-[44px]"
+                          className="py-2.5 px-2 rounded-xl bg-[#eaf5ed] hover:bg-[#d8eedf] active:bg-[#cbe6d4] dark:bg-emerald-950/40 dark:hover:bg-emerald-900/50 border border-emerald-200 dark:border-emerald-800/70 flex items-center justify-center text-center text-[#07382c] dark:text-emerald-200 font-bold text-xs sm:text-[13px] shadow-xs active:scale-95 transition min-h-[38px]"
                         >
                           <span>Hadith</span>
                         </button>
@@ -1483,14 +1513,14 @@
                         <button
                           type="button"
                           onClick={openRamzanEdit}
-                          className="py-3 px-2 rounded-2xl bg-[#eaf5ed] hover:bg-[#d8eedf] active:bg-[#cbe6d4] dark:bg-emerald-950/40 dark:hover:bg-emerald-900/50 border border-emerald-200 dark:border-emerald-800/70 flex items-center justify-center text-center text-[#07382c] dark:text-emerald-200 font-bold text-[13px] sm:text-[14px] shadow-xs active:scale-95 transition min-h-[44px]"
+                          className="py-2.5 px-2 rounded-xl bg-[#eaf5ed] hover:bg-[#d8eedf] active:bg-[#cbe6d4] dark:bg-emerald-950/40 dark:hover:bg-emerald-900/50 border border-emerald-200 dark:border-emerald-800/70 flex items-center justify-center text-center text-[#07382c] dark:text-emerald-200 font-bold text-xs sm:text-[13px] shadow-xs active:scale-95 transition min-h-[38px]"
                         >
                           <span>Sehri / Iftar</span>
                         </button>
                         <button
                           type="button"
                           onClick={() => setShowNewNoticeModal(true)}
-                          className="py-3 px-2 rounded-2xl bg-[#eaf5ed] hover:bg-[#d8eedf] active:bg-[#cbe6d4] dark:bg-emerald-950/40 dark:hover:bg-emerald-900/50 border border-emerald-200 dark:border-emerald-800/70 flex items-center justify-center text-center text-[#07382c] dark:text-emerald-200 font-bold text-[13px] sm:text-[14px] shadow-xs active:scale-95 transition min-h-[44px]"
+                          className="py-2.5 px-2 rounded-xl bg-[#eaf5ed] hover:bg-[#d8eedf] active:bg-[#cbe6d4] dark:bg-emerald-950/40 dark:hover:bg-emerald-900/50 border border-emerald-200 dark:border-emerald-800/70 flex items-center justify-center text-center text-[#07382c] dark:text-emerald-200 font-bold text-xs sm:text-[13px] shadow-xs active:scale-95 transition min-h-[38px]"
                         >
                           <span>Notice</span>
                         </button>
@@ -1499,14 +1529,14 @@
                         <button
                           type="button"
                           onClick={openInfoEdit}
-                          className="py-3 px-2 rounded-2xl bg-[#eaf5ed] hover:bg-[#d8eedf] active:bg-[#cbe6d4] dark:bg-emerald-950/40 dark:hover:bg-emerald-900/50 border border-emerald-200 dark:border-emerald-800/70 flex items-center justify-center text-center text-[#07382c] dark:text-emerald-200 font-bold text-[13px] sm:text-[14px] shadow-xs active:scale-95 transition min-h-[44px]"
+                          className="py-2.5 px-2 rounded-xl bg-[#eaf5ed] hover:bg-[#d8eedf] active:bg-[#cbe6d4] dark:bg-emerald-950/40 dark:hover:bg-emerald-900/50 border border-emerald-200 dark:border-emerald-800/70 flex items-center justify-center text-center text-[#07382c] dark:text-emerald-200 font-bold text-xs sm:text-[13px] shadow-xs active:scale-95 transition min-h-[38px]"
                         >
                           <span>About Masjid</span>
                         </button>
                         <button
                           type="button"
                           onClick={() => { setEditPhotoUrl(loggedImamMasjid.photo); setEditLat(parseFloat(loggedImamMasjid.lat) || 28.6139); setEditLng(parseFloat(loggedImamMasjid.lng) || 77.2090); setShowEditProfileModal(true); }}
-                          className="py-3 px-2 rounded-2xl bg-[#eaf5ed] hover:bg-[#d8eedf] active:bg-[#cbe6d4] dark:bg-emerald-950/40 dark:hover:bg-emerald-900/50 border border-emerald-200 dark:border-emerald-800/70 flex items-center justify-center text-center text-[#07382c] dark:text-emerald-200 font-bold text-[13px] sm:text-[14px] shadow-xs active:scale-95 transition min-h-[44px]"
+                          className="py-2.5 px-2 rounded-xl bg-[#eaf5ed] hover:bg-[#d8eedf] active:bg-[#cbe6d4] dark:bg-emerald-950/40 dark:hover:bg-emerald-900/50 border border-emerald-200 dark:border-emerald-800/70 flex items-center justify-center text-center text-[#07382c] dark:text-emerald-200 font-bold text-xs sm:text-[13px] shadow-xs active:scale-95 transition min-h-[38px]"
                         >
                           <span>Edit Profile</span>
                         </button>
@@ -1515,22 +1545,22 @@
                         <button
                           type="button"
                           onClick={handleImamLogout}
-                          className="py-3 px-2 rounded-2xl bg-[#eaf5ed] hover:bg-[#d8eedf] active:bg-[#cbe6d4] dark:bg-emerald-950/40 dark:hover:bg-emerald-900/50 border border-emerald-200 dark:border-emerald-800/70 flex items-center justify-center text-center text-[#07382c] dark:text-emerald-200 font-bold text-[13px] sm:text-[14px] shadow-xs active:scale-95 transition min-h-[44px]"
+                          className="py-2.5 px-2 rounded-xl bg-[#eaf5ed] hover:bg-[#d8eedf] active:bg-[#cbe6d4] dark:bg-emerald-950/40 dark:hover:bg-emerald-900/50 border border-emerald-200 dark:border-emerald-800/70 flex items-center justify-center text-center text-[#07382c] dark:text-emerald-200 font-bold text-xs sm:text-[13px] shadow-xs active:scale-95 transition min-h-[38px]"
                         >
                           <span>Logout</span>
                         </button>
                         <button
                           type="button"
                           onClick={() => { setDeletePasswordInput(''); setShowDeleteSafetyModal(true); }}
-                          className="py-3 px-2 rounded-2xl bg-[#eaf5ed] hover:bg-rose-50 active:bg-rose-100 dark:bg-emerald-950/40 dark:hover:bg-rose-950/40 border border-emerald-200 dark:border-emerald-800/70 hover:border-rose-300 dark:hover:border-rose-800 flex items-center justify-center text-center text-[#07382c] dark:text-emerald-200 hover:text-rose-700 dark:hover:text-rose-400 font-bold text-[13px] sm:text-[14px] shadow-xs active:scale-95 transition min-h-[44px]"
+                          className="py-2.5 px-2 rounded-xl bg-[#eaf5ed] hover:bg-rose-50 active:bg-rose-100 dark:bg-emerald-950/40 dark:hover:bg-rose-950/40 border border-emerald-200 dark:border-emerald-800/70 hover:border-rose-300 dark:hover:border-rose-800 flex items-center justify-center text-center text-[#07382c] dark:text-emerald-200 hover:text-rose-700 dark:hover:text-rose-400 font-bold text-xs sm:text-[13px] shadow-xs active:scale-95 transition min-h-[38px]"
                         >
                           <span>Delete Profile</span>
                         </button>
                       </div>
                     </div>
 
-                    {/* LARGE GLOWING CIRCULAR LIVE AZAN BUTTON */}
-                    <div className="flex flex-col items-center justify-center py-6 relative">
+                    {/* COMPACT GLOWING CIRCULAR LIVE AZAN BUTTON (NO EXTRA SCROLL, FITS CLEANLY) */}
+                    <div className="flex flex-col items-center justify-center py-1.5 relative shrink-0">
                       <button
                         type="button"
                         onClick={() => {
@@ -1540,41 +1570,21 @@
                             handleStartLiveAzan(loggedImamMasjid.id);
                           }
                         }}
-                        className={`w-36 h-36 rounded-full flex flex-col items-center justify-center text-white font-extrabold shadow-2xl active:scale-95 transition-all duration-300 relative cursor-pointer ${
+                        className={`w-28 h-28 sm:w-32 sm:h-32 rounded-full flex flex-col items-center justify-center text-white font-extrabold shadow-2xl active:scale-95 transition-all duration-300 relative cursor-pointer ${
                           isImamLive
-                            ? 'bg-rose-700 ring-8 ring-rose-400/50 shadow-rose-600/60 animate-pulse'
-                            : 'bg-[#d61818] ring-8 ring-rose-200/70 dark:ring-rose-900/40 shadow-rose-500/40 hover:bg-[#b91212]'
+                            ? 'bg-rose-700 ring-6 ring-rose-400/50 shadow-rose-600/60 animate-pulse'
+                            : 'bg-[#d61818] ring-6 ring-rose-200/70 dark:ring-rose-900/40 shadow-rose-500/40 hover:bg-[#b91212]'
                         }`}
                       >
-                        <div className="text-2xl font-black mb-1 tracking-widest flex items-center gap-1">
-                          <span className="text-xl">((</span>
-                          <span className="w-3 h-3 rounded-full bg-white inline-block"></span>
-                          <span className="text-xl">))</span>
+                        <div className="text-xl font-black mb-0.5 tracking-widest flex items-center gap-1">
+                          <span className="text-base">((</span>
+                          <span className="w-2.5 h-2.5 rounded-full bg-white inline-block"></span>
+                          <span className="text-base">))</span>
                         </div>
-                        <span className="text-xs font-black tracking-wide leading-tight text-center px-2">
+                        <span className="text-[11px] font-black tracking-wide leading-tight text-center px-2">
                           {isImamLive ? 'Stop Live Azan' : 'Start Live Azan'}
                         </span>
                       </button>
-                    </div>
-
-                    {/* SUBTLE MOSQUE SILHOUETTE GRAPHIC AT BOTTOM */}
-                    <div className="mt-auto pt-4 pointer-events-none select-none opacity-80 dark:opacity-40">
-                      <svg viewBox="0 0 400 120" fill="none" xmlns="http://www.w3.org/2000/svg" className="w-full h-auto text-emerald-700/25 dark:text-emerald-500/25">
-                        <path d="M200 20 C185 45 170 55 170 80 L230 80 C230 55 215 45 200 20 Z" fill="currentColor" opacity="0.6"/>
-                        <rect x="198" y="5" width="4" height="15" fill="currentColor" opacity="0.7"/>
-                        <circle cx="200" cy="5" r="3" fill="#eab308" opacity="0.9"/>
-                        <path d="M130 40 C120 58 110 65 110 80 L150 80 C150 65 140 58 130 40 Z" fill="currentColor" opacity="0.4"/>
-                        <path d="M270 40 C260 58 250 65 250 80 L290 80 C290 65 280 58 270 40 Z" fill="currentColor" opacity="0.4"/>
-                        <rect x="80" y="25" width="12" height="55" rx="3" fill="currentColor" opacity="0.5"/>
-                        <polygon points="86,10 80,25 92,25" fill="currentColor" opacity="0.6"/>
-                        <circle cx="86" cy="9" r="2.5" fill="#eab308" opacity="0.8"/>
-                        <rect x="308" y="25" width="12" height="55" rx="3" fill="currentColor" opacity="0.5"/>
-                        <polygon points="314,10 308,25 320,25" fill="currentColor" opacity="0.6"/>
-                        <circle cx="314" cy="9" r="2.5" fill="#eab308" opacity="0.8"/>
-                        <path d="M0 80 Q100 70 200 80 T400 80 L400 120 L0 120 Z" fill="currentColor" opacity="0.3"/>
-                        <path d="M0 95 Q200 75 400 95 L400 120 L0 120 Z" fill="#07382c" opacity="0.5"/>
-                        <path d="M0 105 Q200 90 400 105 L400 120 L0 120 Z" fill="#eab308" opacity="0.4"/>
-                      </svg>
                     </div>
                   </div>
                 ) : (
@@ -2007,9 +2017,15 @@
                 <div className={`${darkMode ? 'bg-slate-800' : 'bg-white'} rounded-[2rem] p-5 max-w-sm w-full space-y-3.5 max-h-[92vh] overflow-y-auto shadow-2xl`}>
                   <div className="flex justify-between border-b pb-2 dark:border-slate-700"><h3 className="font-black text-sm text-emerald-900 dark:text-emerald-300">Register New Mosque</h3><button onClick={() => setShowRegisterModal(false)}>✕</button></div>
                   <form onSubmit={(e) => {
-                    e.preventDefault(); const form = e.target; const id = form.mId.value.trim().toUpperCase().replace(/[^A-Z0-9_-]/g, '');
-                    if (!id) { showToast('❌ Enter valid Mosque ID (Letters/Numbers)', 'error'); return; }
-                    if (Object.keys(masjids).some(k => k.toUpperCase() === id)) { showToast('❌ This ID already exists, choose another ID', 'error'); return; }
+                    e.preventDefault(); const form = e.target;
+                    const id = form.mId.value.trim().toUpperCase().replace(/[^A-Z0-9_-]/g, '');
+                    if (!id) { showToast('❌ सही मस्जिद ID दर्ज करें (जैसे MASJID-101)', 'error'); return; }
+                    const isAlreadyTaken = Object.keys(masjids).some(k => k.trim().toUpperCase() === id) ||
+                                           Object.values(masjids).some(m => m.id && m.id.trim().toUpperCase() === id);
+                    if (isAlreadyTaken) {
+                      showToast('❌ यह ID पहले से किसी मस्जिद की है! कृपया कोई दूसरी अनोखी ID चुनें', 'error');
+                      return;
+                    }
                     const finalLat = parseFloat(regLat) || userLocation.lat || 28.6139;
                     const finalLng = parseFloat(regLng) || userLocation.lng || 77.2090;
                     const newM = {
@@ -2019,20 +2035,13 @@
                     };
                     publishMasjidUpdate(newM); setSelectedMasjidId(id); setFavorites([id]); setLoggedImamMasjidId(id);
                     setUserLocation({ lat: finalLat, lng: finalLng }); setHasGps(true); safeStorageSet('mc_user_location', JSON.stringify({ lat: finalLat, lng: finalLng })); safeStorageSet('mc_logged_imam_masjid_id', id); safeStorageSet('mc_selected_masjid_id', id); safeStorageSet('mc_user_favorites', JSON.stringify([id]));
-                    setShowRegisterModal(false); setCurrentTab('profile'); showToast(`✅ Mosque Registered! ID: ${id}`);
+                    setShowRegisterModal(false); setCurrentTab('profile'); showToast(`✅ मस्जिद रजिस्टर हो गई! ID: ${id}`);
                   }} className="space-y-3 text-xs">
                     <div className="flex items-center gap-3 p-2 bg-emerald-50 dark:bg-slate-700/80 rounded-xl border border-emerald-100 dark:border-slate-600">
                         <img src={regPhotoUrl || 'https://images.unsplash.com/photo-1542816417-0983c9c9ad53?auto=format&fit=crop&w=800&q=80'} className="w-14 h-14 rounded-full object-cover border-2 border-emerald-500" />
                         <div><input type="file" id="reg-photo-input" accept="image/*" className="hidden" onChange={handleGalleryPhotoUpload} /><label htmlFor="reg-photo-input" className="px-3 py-1.5 bg-[#07382c] text-white text-[10px] font-bold rounded-lg cursor-pointer shadow-sm">📸 Choose Photo from Gallery</label></div>
                     </div>
-                    <div className="p-2 bg-emerald-50 dark:bg-slate-700/80 rounded-2xl border dark:border-slate-600">
-                      <div className="flex justify-between items-center mb-1"><span className="font-extrabold text-emerald-950 dark:text-emerald-300">📍 GPS Coordinates</span><button type="button" onClick={()=>handleFetchGpsLocation(false)} className="px-2 py-1 bg-[#07382c] text-white rounded text-[10px]">🔄 Refresh GPS</button></div>
-                      <div className="grid grid-cols-2 gap-2 text-[10px]">
-                        <div><input type="number" step="any" value={regLat} onChange={(e)=>setRegLat(e.target.value)} placeholder="Latitude (e.g. 26.073)" className="w-full p-2 border rounded-xl dark:bg-slate-800 dark:border-slate-600 font-mono" required /></div>
-                        <div><input type="number" step="any" value={regLng} onChange={(e)=>setRegLng(e.target.value)} placeholder="Longitude (e.g. 83.185)" className="w-full p-2 border rounded-xl dark:bg-slate-800 dark:border-slate-600 font-mono" required /></div>
-                      </div>
-                    </div>
-                    <div><input type="text" name="mName" placeholder="Mosque Name (e.g. Jama Masjid) *" required className="w-full p-2.5 border rounded-2xl dark:bg-slate-700 dark:border-slate-600" /></div>
+                    <div><input type="text" name="mName" placeholder="Mosque Name (e.g. Jama Masjid) *" required className="w-full p-2.5 border rounded-2xl dark:bg-slate-700 dark:border-slate-600 font-bold" /></div>
                     <div className="grid grid-cols-2 gap-2">
                       <div><input name="mAddress" placeholder="Address / Mohalla (e.g. Mohalla Azad Nagar) *" required className="w-full p-2.5 border rounded-2xl dark:bg-slate-700 dark:border-slate-600" /></div>
                       <div><input name="mCity" placeholder="City (e.g. Azamgarh) *" required className="w-full p-2.5 border rounded-2xl dark:bg-slate-700 dark:border-slate-600" /></div>
@@ -2046,7 +2055,22 @@
                       <div><input name="mId" defaultValue={'MASJID-' + Math.floor(100 + Math.random() * 900)} placeholder="Mosque ID (e.g. MASJID-101) *" required className="w-full p-2.5 border rounded-xl font-mono font-bold uppercase dark:bg-slate-700 dark:border-slate-600" /></div>
                       <div><input name="mPasscode" defaultValue="786" placeholder="Password (e.g. 786) *" required className="w-full p-2.5 border rounded-xl font-mono font-bold dark:bg-slate-700 dark:border-slate-600" /></div>
                     </div>
-                    <div className="flex gap-2 pt-1"><button type="button" onClick={() => setShowRegisterModal(false)} className="w-1/3 py-2.5 bg-slate-100 dark:bg-slate-700 rounded-xl font-bold text-xs">Cancel</button><button type="submit" className="w-2/3 py-2.5 bg-[#07382c] text-white rounded-xl font-black text-xs">✅ Register Mosque</button></div>
+
+                    {/* LOCATION AT THE BOTTOM OF REGISTRATION WITH SATELLITE GOOGLE MAP */}
+                    <div className="pt-2 border-t dark:border-slate-700 space-y-1.5">
+                      <div className="flex justify-between items-center">
+                        <span className="font-extrabold text-emerald-950 dark:text-emerald-300 text-xs">📍 Mosque Location on Satellite Map</span>
+                        <button type="button" onClick={() => handleFetchGpsLocation(false)} className="px-2.5 py-1 bg-[#07382c] text-white rounded-lg text-[10px] font-bold">🔄 Refresh GPS</button>
+                      </div>
+                      <LocationPicker lat={parseFloat(regLat) || 28.6139} lng={parseFloat(regLng) || 77.2090} onChange={(a, b) => { setRegLat(a); setRegLng(b); }} />
+                      <p className="text-[10px] text-slate-500">Tap on map or drag 📍 to place on mosque roof.</p>
+                      <div className="flex items-center justify-between gap-2 p-1.5 bg-emerald-50 dark:bg-slate-700/60 rounded-xl border border-emerald-100 dark:border-slate-600">
+                        <span className="text-[10px] font-mono font-bold text-emerald-800 dark:text-emerald-300">{Number(regLat || 28.6139).toFixed(5)}, {Number(regLng || 77.2090).toFixed(5)}</span>
+                        <span className="text-[9.5px] text-slate-500 font-semibold">उपग्रह (Satellite) व्यू</span>
+                      </div>
+                    </div>
+
+                    <div className="flex gap-2 pt-1"><button type="button" onClick={() => setShowRegisterModal(false)} className="w-1/3 py-2.5 bg-slate-100 dark:bg-slate-700 rounded-xl font-bold text-xs">Cancel</button><button type="submit" className="w-2/3 py-2.5 bg-[#07382c] text-white rounded-xl font-black text-xs shadow-md">✅ Register Mosque</button></div>
                   </form>
                 </div>
               </div>
