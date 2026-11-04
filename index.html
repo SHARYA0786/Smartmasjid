@@ -195,6 +195,121 @@
       const t12 = (key, v, def) => { const x = splitTime12(key, v, def); return `${x.t} ${x.ap}`.trim(); };
       const T = (sch, key, def) => { const x = splitTime12(key, sch && sch[key], def); return <>{x.t}<span className="text-[9px] font-bold ml-0.5">{x.ap}</span></>; };
 
+      // ---- NAMAZ PROGRESS BAR HELPER & COMPONENT ----
+      const getNamazProgressInfo = (schedule, now = new Date()) => {
+        if (!schedule) return null;
+        const sch = normSchedule(schedule);
+        const parseMin = (str) => {
+          if (!str) return 0;
+          const m = String(str).match(/^(\d{1,2}):(\d{2})/);
+          if (!m) return 0;
+          return parseInt(m[1], 10) * 60 + parseInt(m[2], 10);
+        };
+
+        const prayers = [
+          { key: 'fajr', label: 'Fajr', timeStr: sch.fajr || '05:20', min: parseMin(sch.fajr || '05:20') },
+          { key: 'zuhr', label: 'Zuhr', timeStr: sch.zuhr || '12:35', min: parseMin(sch.zuhr || '12:35') },
+          { key: 'asr', label: 'Asr', timeStr: sch.asr || '16:20', min: parseMin(sch.asr || '16:20') },
+          { key: 'maghrib', label: 'Maghrib', timeStr: sch.maghrib || '17:50', min: parseMin(sch.maghrib || '17:50') },
+          { key: 'isha', label: 'Isha', timeStr: sch.isha || '19:15', min: parseMin(sch.isha || '19:15') }
+        ];
+
+        const nowMin = now.getHours() * 60 + now.getMinutes() + now.getSeconds() / 60;
+        let nextKey = 'fajr';
+        let startMin = prayers[4].min - 1440;
+        let endMin = prayers[0].min;
+
+        if (nowMin < prayers[0].min) {
+          nextKey = 'fajr';
+          startMin = prayers[4].min - 1440;
+          endMin = prayers[0].min;
+        } else if (nowMin < prayers[1].min) {
+          nextKey = 'zuhr';
+          startMin = prayers[0].min;
+          endMin = prayers[1].min;
+        } else if (nowMin < prayers[2].min) {
+          nextKey = 'asr';
+          startMin = prayers[1].min;
+          endMin = prayers[2].min;
+        } else if (nowMin < prayers[3].min) {
+          nextKey = 'maghrib';
+          startMin = prayers[2].min;
+          endMin = prayers[3].min;
+        } else if (nowMin < prayers[4].min) {
+          nextKey = 'isha';
+          startMin = prayers[3].min;
+          endMin = prayers[4].min;
+        } else {
+          nextKey = 'fajr';
+          startMin = prayers[4].min;
+          endMin = prayers[0].min + 1440;
+        }
+
+        const effectiveNow = (nowMin < prayers[0].min) ? nowMin : (nowMin >= prayers[4].min && endMin > 1440 ? nowMin : nowMin);
+        const totalSpan = Math.max(1, endMin - startMin);
+        const elapsed = Math.max(0, effectiveNow - startMin);
+        const progress = Math.min(100, Math.max(0, Math.round((elapsed / totalSpan) * 100)));
+
+        const remainingMin = Math.max(0, Math.round(endMin - effectiveNow));
+        const remH = Math.floor(remainingMin / 60);
+        const remM = remainingMin % 60;
+        const remainStr = remH > 0 ? `${remH}h ${remM}m` : `${remM}m`;
+
+        const nextPrayerObj = prayers.find(p => p.key === nextKey) || prayers[0];
+        const nextTime12 = t12(nextKey, nextPrayerObj.timeStr);
+
+        const enrichedPrayers = prayers.map(p => {
+          const isPassed = nowMin >= p.min;
+          const isNext = p.key === nextKey;
+          return {
+            ...p,
+            time12: t12(p.key, p.timeStr),
+            isPassed,
+            isNext
+          };
+        });
+
+        return {
+          nextKey,
+          nextName: nextPrayerObj.label,
+          nextTime12,
+          progress,
+          remainStr,
+          prayers: enrichedPrayers
+        };
+      };
+
+      const NamazProgressBar = ({ schedule, currentTime, darkMode }) => {
+        const info = getNamazProgressInfo(schedule, currentTime);
+        if (!info) return null;
+        return (
+          <div className={`${darkMode ? 'bg-slate-800 border-slate-700' : 'bg-white border-slate-200'} rounded-2xl py-1.5 px-3 border shadow-xs space-y-1.5`}>
+            {/* Header: Next Prayer name, time & Countdown */}
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-1.5 min-w-0">
+                <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-ping shrink-0" />
+                <span className="text-[11px] font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wide">Next:</span>
+                <span className="font-extrabold text-xs text-emerald-800 dark:text-emerald-300 truncate">
+                  {info.nextName} {info.nextTime12}
+                </span>
+              </div>
+              <div className="flex items-center gap-1 font-mono font-black text-[10.5px] text-amber-700 dark:text-amber-300 bg-amber-50 dark:bg-amber-950/40 px-2 py-0.5 rounded-full border border-amber-200 dark:border-amber-800/40 shrink-0">
+                <span>⏳</span>
+                <span>{info.remainStr} left</span>
+              </div>
+            </div>
+
+            {/* Dynamic Progress Line */}
+            <div className="w-full h-2 bg-slate-100 dark:bg-slate-700/80 rounded-full overflow-hidden p-[1px] border border-slate-200 dark:border-slate-600">
+              <div
+                className="h-full rounded-full bg-gradient-to-r from-emerald-600 via-teal-500 to-amber-400 transition-all duration-700 shadow-xs"
+                style={{ width: `${info.progress}%` }}
+              />
+            </div>
+          </div>
+        );
+      };
+
       // ==========================================================
       // ADMIN (APP BANANE WALE) KI JANKARI - yahin badlein
       // upiId khaali ("") ho to "सर्वर में मदद करें" card nahi dikhega
@@ -557,6 +672,17 @@
                   setSelectedMasjidId(prev => (prev === ev.deletedId ? null : prev));
                   setLoggedImamMasjidId(prev => { if (prev === ev.deletedId) { try { localStorage.removeItem('mc_logged_imam_masjid_id'); } catch (e) {} return null; } return prev; });
                 }
+                if (ev.type === 'FAVORITE_COUNT_UPDATE' && ev.masjidId) {
+                  setMasjids(prev => {
+                    const target = prev[ev.masjidId];
+                    if (!target) return prev;
+                    const cur = target.followersCount ?? target.favoritesCount ?? (s.favorites.includes(ev.masjidId) ? 1 : 0);
+                    const nextCount = Math.max(0, cur + (ev.delta || 0));
+                    const updated = { ...prev, [ev.masjidId]: { ...target, followersCount: nextCount, updatedAt: Date.now() } };
+                    persist(updated);
+                    return updated;
+                  });
+                }
               } catch (e) {}
             }
             if (topic === TOPIC_LIVE_AZAN) {
@@ -652,6 +778,23 @@
         const toggleFavorite = (id) => {
           const isCurrentlyFav = favorites.includes(id); const updated = isCurrentlyFav ? [] : [id];
           setFavorites(updated); safeStorageSet('mc_user_favorites', JSON.stringify(updated));
+          
+          const delta = isCurrentlyFav ? -1 : 1;
+          setMasjids(prev => {
+            const target = prev[id];
+            if (!target) return prev;
+            const cur = target.followersCount ?? target.favoritesCount ?? (isCurrentlyFav ? 1 : 0);
+            const nextCount = Math.max(0, cur + delta);
+            const updatedMasjid = { ...target, followersCount: nextCount, updatedAt: Date.now() };
+            const updatedMap = { ...prev, [id]: updatedMasjid };
+            safeStorageSet('mc_db_v12', JSON.stringify(updatedMap));
+            return updatedMap;
+          });
+
+          if (mqttClient && mqttClient.connected) {
+            mqttClient.publish(TOPIC_EVENTS, JSON.stringify({ type: 'FAVORITE_COUNT_UPDATE', masjidId: id, delta }), { qos: 1 });
+          }
+
           if (!isCurrentlyFav) { setSelectedMasjidId(id); safeStorageSet('mc_selected_masjid_id', id); setCurrentTab('home'); showToast('⭐ यह मस्जिद आपकी पसंदीदा बन गई!'); } 
           else { setSelectedMasjidId(null); localStorage.removeItem('mc_selected_masjid_id'); showToast('⭐ पसंदीदा हटा दी गई'); }
         };
@@ -939,11 +1082,11 @@
             )}
 
             {/* HEADER */}
-            <header className="bg-[#07382c] text-white px-3 py-2.5 rounded-b-[1.75rem] shadow-md relative z-10 border-b border-amber-500/20">
+            <header className="bg-[#07382c] text-white px-3 py-2 rounded-b-2xl shadow-md relative z-10 border-b border-amber-500/20">
               {currentMasjid ? (
                 <div className="flex items-center gap-2.5 w-full min-w-0">
                   {/* Square Profile Photo with Gold Border */}
-                  <div className="w-[66px] h-[82px] rounded-2xl overflow-hidden border-2 border-amber-400 shrink-0 shadow-lg bg-emerald-950 relative">
+                  <div className="w-[58px] h-[72px] rounded-xl overflow-hidden border-2 border-amber-400 shrink-0 shadow-lg bg-emerald-950 relative">
                     <img src={currentMasjid.photo || 'https://images.unsplash.com/photo-1542816417-0983c9c9ad53?auto=format&fit=crop&w=800&q=80'} alt={currentMasjid.name} className="w-full h-full object-cover" />
                     {currentMasjid.isLive && <span className="absolute inset-0 bg-rose-600/40 flex justify-center items-center text-[10px] font-black animate-pulse">LIVE</span>}
                   </div>
@@ -952,7 +1095,7 @@
                   <div className="flex-1 min-w-0 pr-1">
                     {/* Line 1: Mosque Name + Small Star Toggle without background */}
                     <div className="flex items-center gap-1.5 flex-wrap">
-                      <h1 className="font-masjid text-2xl sm:text-3xl font-black uppercase text-amber-300 tracking-wide truncate drop-shadow-sm leading-tight">
+                      <h1 className="font-masjid text-xl sm:text-2xl font-black uppercase text-amber-300 tracking-wide truncate drop-shadow-sm leading-tight">
                         {currentMasjid.name}
                       </h1>
                       <button
@@ -973,45 +1116,45 @@
                     </div>
 
                     {/* Line 3: City / State (Subtle mint-green/white font) */}
-                    <div className="text-[10.5px] text-emerald-200/90 font-medium truncate leading-snug">
+                    <div className="text-[10px] text-emerald-200/90 font-medium truncate leading-snug">
                       {currentMasjid.stateLocation || currentMasjid.stateName || 'स्थान'}
                     </div>
                   </div>
 
                   {/* Right Action Icons: ONLY 2 ICONS (Notification Bell + Theme Toggle) */}
-                  <div className="flex flex-col items-center gap-1.5 shrink-0">
-                    <button onClick={() => { const all = currentMasjid.notifications || []; setNotifModalItems(all.filter(n => !readNotificationIds.includes(n.id))); if (all.length) { const u = Array.from(new Set([...readNotificationIds, ...all.map(n => n.id)])); setReadNotificationIds(u); safeStorageSet('mc_read_notifs', JSON.stringify(u)); } setShowNotificationsModal(true); }} aria-label="सूचनाएं" className="w-[30px] h-[30px] rounded-full bg-white/10 flex justify-center items-center relative hover:bg-white/20 active:scale-95 transition">
-                      <svg className="w-4 h-4 text-white" fill="currentColor" viewBox="0 0 24 24"><path d="M12 22c1.1 0 2-.9 2-2h-4c0 1.1.9 2 2 2zm6-6v-5c0-3.07-1.63-5.64-4.5-6.32V4c0-.83-.67-1.5-1.5-1.5s-1.5.67-1.5 1.5v.68C7.64 5.36 6 7.92 6 11v5l-2 2v1h16v-1l-2-2z"/></svg>
-                      {unreadNotificationCount > 0 && <span className="absolute -top-1 -right-1 min-w-[15px] h-[15px] rounded-full bg-rose-600 text-[9px] font-black flex items-center justify-center animate-pulse px-0.5 border border-[#07382c]">{unreadNotificationCount}</span>}
+                  <div className="flex flex-col items-center gap-1 shrink-0">
+                    <button onClick={() => { const all = currentMasjid.notifications || []; setNotifModalItems(all.filter(n => !readNotificationIds.includes(n.id))); if (all.length) { const u = Array.from(new Set([...readNotificationIds, ...all.map(n => n.id)])); setReadNotificationIds(u); safeStorageSet('mc_read_notifs', JSON.stringify(u)); } setShowNotificationsModal(true); }} aria-label="सूचनाएं" className="w-[28px] h-[28px] rounded-full bg-white/10 flex justify-center items-center relative hover:bg-white/20 active:scale-95 transition">
+                      <svg className="w-3.5 h-3.5 text-white" fill="currentColor" viewBox="0 0 24 24"><path d="M12 22c1.1 0 2-.9 2-2h-4c0 1.1.9 2 2 2zm6-6v-5c0-3.07-1.63-5.64-4.5-6.32V4c0-.83-.67-1.5-1.5-1.5s-1.5.67-1.5 1.5v.68C7.64 5.36 6 7.92 6 11v5l-2 2v1h16v-1l-2-2z"/></svg>
+                      {unreadNotificationCount > 0 && <span className="absolute -top-1 -right-1 min-w-[14px] h-[14px] rounded-full bg-rose-600 text-[8.5px] font-black flex items-center justify-center animate-pulse px-0.5 border border-[#07382c]">{unreadNotificationCount}</span>}
                     </button>
-                    <button onClick={toggleDarkMode} className="w-[30px] h-[30px] rounded-full bg-white/10 text-sm flex justify-center items-center hover:bg-white/20 active:scale-95 transition">{darkMode ? '☀️' : '🎨'}</button>
+                    <button onClick={toggleDarkMode} className="w-[28px] h-[28px] rounded-full bg-white/10 text-xs flex justify-center items-center hover:bg-white/20 active:scale-95 transition">{darkMode ? '☀️' : '🎨'}</button>
                   </div>
                 </div>
               ) : (
                 <div className="flex justify-between items-center w-full">
-                  <div className="flex items-center gap-3"><div className="w-12 h-12 rounded-full bg-emerald-900 border-2 border-amber-400 flex justify-center items-center text-2xl">🕌</div><div><h1 className="text-base font-black uppercase">मस्जिद कनेक्ट</h1><p className="text-[11px] text-amber-200">स्मार्ट लाइव नेटवर्क</p></div></div>
-                  <button onClick={toggleDarkMode} className="w-8 h-8 rounded-full bg-white/10 text-base">{darkMode ? '☀️' : '🎨'}</button>
+                  <div className="flex items-center gap-3"><div className="w-10 h-10 rounded-full bg-emerald-900 border-2 border-amber-400 flex justify-center items-center text-xl">🕌</div><div><h1 className="text-sm font-black uppercase">मस्जिद कनेक्ट</h1><p className="text-[10px] text-amber-200">स्मार्ट लाइव नेटवर्क</p></div></div>
+                  <button onClick={toggleDarkMode} className="w-7 h-7 rounded-full bg-white/10 text-sm">{darkMode ? '☀️' : '🎨'}</button>
                 </div>
               )}
             </header>
 
             {currentMasjid && currentMasjid.isLive && (
-              <div className="mx-4 mt-2.5 z-20 bg-rose-600 text-white rounded-2xl p-2.5 px-3.5 shadow-xl flex justify-between items-center border-2 border-rose-300">
+              <div className="mx-3 mt-1.5 z-20 bg-rose-600 text-white rounded-xl p-2 px-3 shadow-lg flex justify-between items-center border border-rose-300">
                 <div className="flex items-center gap-2"><div className="flex gap-1"><span className="w-1 bg-white rounded-full wave-bar-1" /><span className="w-1 bg-white rounded-full wave-bar-2" /><span className="w-1 bg-white rounded-full wave-bar-3" /></div><div><h4 className="font-black text-xs">🔴 लाइव अज़ान चालू है!</h4></div></div>
-                {!isImamLive && liveAzanOn && <button onClick={() => { azanStreamer.initContext(); if (activeListeningMasjidId === currentMasjid.id) setActiveListeningMasjidId(null); else { setActiveListeningMasjidId(currentMasjid.id); azanStreamer.playMelodicAlarm(); } }} className={`px-3 py-1.5 rounded-xl font-black text-xs shadow transition ${activeListeningMasjidId === currentMasjid.id ? 'bg-white text-emerald-800' : 'bg-white text-rose-700 animate-pulse'}`}>{activeListeningMasjidId === currentMasjid.id ? '🔊 चालू है' : '🔊 सुनें'}</button>}
+                {!isImamLive && liveAzanOn && <button onClick={() => { azanStreamer.initContext(); if (activeListeningMasjidId === currentMasjid.id) setActiveListeningMasjidId(null); else { setActiveListeningMasjidId(currentMasjid.id); azanStreamer.playMelodicAlarm(); } }} className={`px-2.5 py-1 rounded-lg font-black text-[11px] shadow transition ${activeListeningMasjidId === currentMasjid.id ? 'bg-white text-emerald-800' : 'bg-white text-rose-700 animate-pulse'}`}>{activeListeningMasjidId === currentMasjid.id ? '🔊 चालू है' : '🔊 सुनें'}</button>}
               </div>
             )}
             
             {incomingAzanAlert && (!currentMasjid || currentMasjid.id !== incomingAzanAlert.masjidId) && (
-              <div className="mx-4 mt-2.5 z-20 bg-rose-600 text-white rounded-2xl p-2.5 px-3.5 shadow-xl flex justify-between items-center animate-bounce border-2 border-rose-300">
-                <div className="flex items-center gap-2"><span className="text-xl">📢</span><div><h4 className="font-black text-xs">🔴 {incomingAzanAlert.masjidName} से लाइव अज़ान चालू है!</h4></div></div>
-                <button onClick={() => { setSelectedMasjidId(incomingAzanAlert.masjidId); setActiveListeningMasjidId(incomingAzanAlert.masjidId); setCurrentTab('home'); }} className="px-3 py-1.5 rounded-xl font-black text-xs bg-white text-rose-700 shadow">सुनें</button>
+              <div className="mx-3 mt-1.5 z-20 bg-rose-600 text-white rounded-xl p-2 px-3 shadow-lg flex justify-between items-center animate-bounce border border-rose-300">
+                <div className="flex items-center gap-2"><span className="text-lg">📢</span><div><h4 className="font-black text-xs">🔴 {incomingAzanAlert.masjidName} से लाइव अज़ान चालू है!</h4></div></div>
+                <button onClick={() => { setSelectedMasjidId(incomingAzanAlert.masjidId); setActiveListeningMasjidId(incomingAzanAlert.masjidId); setCurrentTab('home'); }} className="px-2.5 py-1 rounded-lg font-black text-[11px] bg-white text-rose-700 shadow">सुनें</button>
               </div>
             )}
 
             {/* TAB 1: HOME */}
             {currentTab === 'home' && (
-              <main className="px-3.5 py-3 space-y-2.5 flex-1 z-0">
+              <main className="px-3 py-1.5 space-y-1.5 flex-1 z-0">
                 {!currentMasjid ? (
                   landingRoleChoice !== 'muqtadi' ? (
                     <div className="py-2 space-y-3.5">
@@ -1061,24 +1204,24 @@
                       const rz = currentMasjid.ramzan || {};
                       const sch0 = normSchedule(currentMasjid.schedule);
                       return (
-                        <div className={`${darkMode ? 'bg-slate-800 border-slate-700' : 'bg-white border-slate-200'} rounded-3xl p-3.5 px-4 border shadow-sm`}>
+                        <div className={`${darkMode ? 'bg-slate-800 border-slate-700' : 'bg-white border-slate-200'} rounded-2xl py-1.5 px-3 border shadow-xs`}>
                           <div className="grid grid-cols-2 divide-x divide-slate-200 dark:divide-slate-700">
                             {/* Left Column: English Date + Sehri */}
-                            <div className="pr-3 space-y-2">
-                              <div className="flex items-center gap-2">
-                                <span className="text-sm">📅</span>
+                            <div className="pr-2 space-y-1">
+                              <div className="flex items-center gap-1.5">
+                                <span className="text-xs">📅</span>
                                 <div className="min-w-0">
-                                  <span className="text-[10px] text-slate-500 dark:text-slate-400 font-medium block leading-none">English Date</span>
-                                  <strong className="text-xs font-bold block leading-tight mt-0.5 truncate text-slate-900 dark:text-slate-100">
+                                  <span className="text-[9.5px] text-slate-500 dark:text-slate-400 font-medium block leading-none">English Date</span>
+                                  <strong className="text-[11.5px] font-bold block leading-tight mt-0.5 truncate text-slate-900 dark:text-slate-100">
                                     {currentTime.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: '2-digit', year: 'numeric' })}
                                   </strong>
                                 </div>
                               </div>
-                              <div className="flex items-center gap-2 pt-1.5 border-t border-slate-100 dark:border-slate-700/60">
-                                <span className="text-sm text-sky-600">🌙</span>
+                              <div className="flex items-center gap-1.5 pt-0.5 border-t border-slate-100 dark:border-slate-700/60">
+                                <span className="text-xs text-sky-600">🌙</span>
                                 <div>
-                                  <span className="text-[10px] text-slate-500 dark:text-slate-400 font-medium block leading-none">सहरी (Sehri)</span>
-                                  <strong className="text-xs font-mono font-black text-sky-700 dark:text-sky-300 block leading-tight mt-0.5">
+                                  <span className="text-[9.5px] text-slate-500 dark:text-slate-400 font-medium block leading-none">सहरी (Sehri)</span>
+                                  <strong className="text-xs font-mono font-black text-sky-700 dark:text-sky-300 block leading-tight">
                                     {t12('sehri', rz.sehri || sch0.fajr)}
                                   </strong>
                                 </div>
@@ -1086,21 +1229,21 @@
                             </div>
 
                             {/* Right Column: Hijri Date + Iftar */}
-                            <div className="pl-3 space-y-2">
-                              <div className="flex items-center gap-2">
-                                <span className="text-sm">🕌</span>
+                            <div className="pl-2 space-y-1">
+                              <div className="flex items-center gap-1.5">
+                                <span className="text-xs">🕌</span>
                                 <div className="min-w-0">
-                                  <span className="text-[10px] text-slate-500 dark:text-slate-400 font-medium block leading-none">Hijri Date</span>
-                                  <strong className="text-xs font-bold font-urdu block leading-tight mt-0.5 truncate text-emerald-800 dark:text-emerald-400">
+                                  <span className="text-[9.5px] text-slate-500 dark:text-slate-400 font-medium block leading-none">Hijri Date</span>
+                                  <strong className="text-[11.5px] font-bold font-urdu block leading-tight mt-0.5 truncate text-emerald-800 dark:text-emerald-400">
                                     {getAutoCalculatedHijriDate(currentMasjid, currentTime)}
                                   </strong>
                                 </div>
                               </div>
-                              <div className="flex items-center gap-2 pt-1.5 border-t border-slate-100 dark:border-slate-700/60">
-                                <span className="text-sm text-amber-500">🌇</span>
+                              <div className="flex items-center gap-1.5 pt-0.5 border-t border-slate-100 dark:border-slate-700/60">
+                                <span className="text-xs text-amber-500">🌇</span>
                                 <div>
-                                  <span className="text-[10px] text-slate-500 dark:text-slate-400 font-medium block leading-none">इफ़्तार (Iftar)</span>
-                                  <strong className="text-xs font-mono font-black text-amber-600 dark:text-amber-400 block leading-tight mt-0.5">
+                                  <span className="text-[9.5px] text-slate-500 dark:text-slate-400 font-medium block leading-none">इफ़्तार (Iftar)</span>
+                                  <strong className="text-xs font-mono font-black text-amber-600 dark:text-amber-400 block leading-tight">
                                     {t12('iftar', rz.iftar || sch0.maghrib)}
                                   </strong>
                                 </div>
@@ -1111,34 +1254,37 @@
                       );
                     })()}
 
+                    {/* NAMAZ PROGRESS BAR */}
+                    <NamazProgressBar schedule={currentMasjid.schedule} currentTime={currentTime} darkMode={darkMode} />
+
                     {/* NAMAZ KE AWAQAT */}
-                    <div className="bg-[#0c4033] text-white rounded-3xl p-3.5 shadow-md relative mt-3">
-                      <div className="flex justify-between items-center mb-3">
-                         <h3 className="font-bold text-sm tracking-wide">Namaz Ke Awaqat</h3>
-                         <button onClick={toggleLiveAzanPref} aria-pressed={liveAzanOn} className={`px-2.5 py-1 rounded-full text-[11px] font-extrabold border flex items-center gap-1 ${liveAzanOn ? 'bg-rose-500 border-rose-300 text-white' : 'bg-white/10 border-white/30 text-white/80'}`}>{liveAzanOn ? '🔔' : '🔕'} लाइव अज़ान: {liveAzanOn ? 'ON' : 'OFF'}</button>
+                    <div className="bg-[#0c4033] text-white rounded-2xl p-2.5 shadow-md relative mt-1.5">
+                      <div className="flex justify-between items-center mb-2">
+                         <h3 className="font-bold text-xs tracking-wide">Namaz Ke Awaqat</h3>
+                         <button onClick={toggleLiveAzanPref} aria-pressed={liveAzanOn} className={`px-2 py-0.5 rounded-full text-[10px] font-extrabold border flex items-center gap-1 ${liveAzanOn ? 'bg-rose-500 border-rose-300 text-white' : 'bg-white/10 border-white/30 text-white/80'}`}>{liveAzanOn ? '🔔' : '🔕'} लाइव अज़ान: {liveAzanOn ? 'ON' : 'OFF'}</button>
                       </div>
                       
-                      <div className="grid grid-cols-5 gap-1.5 text-center">
-                        <div className="bg-[#c8f0d8] text-slate-900 rounded-2xl p-1.5 flex flex-col items-center"><span className="text-xs font-bold text-slate-800">Fajr</span><div className="my-1 text-emerald-700 text-xl">🌅</div><span className="text-[9px] text-slate-600 font-semibold">Azan</span><strong className="text-xs font-mono font-bold my-0.5">{T(currentMasjid.schedule, 'fajr', '05:20')}</strong><span className="text-[9px] text-slate-600 font-semibold mt-1">Jamat</span><strong className="text-xs font-mono font-black text-emerald-950">{T(currentMasjid.schedule, 'fajrJamat', '05:45')}</strong></div>
-                        <div className="bg-[#fff6be] text-slate-900 rounded-2xl p-1.5 flex flex-col items-center"><span className="text-xs font-bold text-slate-800">Zuhr</span><div className="my-1 text-amber-600 text-xl">☀️</div><span className="text-[9px] text-slate-600 font-semibold">Azan</span><strong className="text-xs font-mono font-bold my-0.5">{T(currentMasjid.schedule, 'zuhr', '12:35')}</strong><span className="text-[9px] text-slate-600 font-semibold mt-1">Jamat</span><strong className="text-xs font-mono font-black text-amber-950">{T(currentMasjid.schedule, 'zuhrJamat', '01:00')}</strong></div>
-                        <div className="bg-[#fedfc7] text-slate-900 rounded-2xl p-1.5 flex flex-col items-center"><span className="text-xs font-bold text-slate-800">Asr</span><div className="my-1 text-orange-600 text-xl">🌤️</div><span className="text-[9px] text-slate-600 font-semibold">Azan</span><strong className="text-xs font-mono font-bold my-0.5">{T(currentMasjid.schedule, 'asr', '04:20')}</strong><span className="text-[9px] text-slate-600 font-semibold mt-1">Jamat</span><strong className="text-xs font-mono font-black text-orange-950">{T(currentMasjid.schedule, 'asrJamat', '04:45')}</strong></div>
-                        <div className="bg-[#ffd7dc] text-slate-900 rounded-2xl p-1.5 flex flex-col items-center"><span className="text-xs font-bold text-slate-800">Maghrib</span><div className="my-1 text-rose-600 text-xl">🌇</div><span className="text-[9px] text-slate-600 font-semibold">Azan</span><strong className="text-xs font-mono font-bold my-0.5">{T(currentMasjid.schedule, 'maghrib', '05:50')}</strong><span className="text-[9px] text-slate-600 font-semibold mt-1">Jamat</span><strong className="text-xs font-mono font-black text-rose-950">{T(currentMasjid.schedule, 'maghribJamat', '06:10')}</strong></div>
-                        <div className="bg-[#d2edfd] text-slate-900 rounded-2xl p-1.5 flex flex-col items-center"><span className="text-xs font-bold text-slate-800">Isha</span><div className="my-1 text-sky-700 text-xl">🌙</div><span className="text-[9px] text-slate-600 font-semibold">Azan</span><strong className="text-xs font-mono font-bold my-0.5">{T(currentMasjid.schedule, 'isha', '07:15')}</strong><span className="text-[9px] text-slate-600 font-semibold mt-1">Jamat</span><strong className="text-xs font-mono font-black text-sky-950">{T(currentMasjid.schedule, 'ishaJamat', '07:45')}</strong></div>
+                      <div className="grid grid-cols-5 gap-1 text-center">
+                        <div className="bg-[#c8f0d8] text-slate-900 rounded-xl p-1 flex flex-col items-center"><span className="text-[11px] font-bold text-slate-800">Fajr</span><div className="my-0.5 text-emerald-700 text-base">🌅</div><span className="text-[8.5px] text-slate-600 font-semibold leading-none">Azan</span><strong className="text-[11px] font-mono font-bold my-0.5 leading-tight">{T(currentMasjid.schedule, 'fajr', '05:20')}</strong><span className="text-[8.5px] text-slate-600 font-semibold mt-0.5 leading-none">Jamat</span><strong className="text-[11px] font-mono font-black text-emerald-950 leading-tight">{T(currentMasjid.schedule, 'fajrJamat', '05:45')}</strong></div>
+                        <div className="bg-[#fff6be] text-slate-900 rounded-xl p-1 flex flex-col items-center"><span className="text-[11px] font-bold text-slate-800">Zuhr</span><div className="my-0.5 text-amber-600 text-base">☀️</div><span className="text-[8.5px] text-slate-600 font-semibold leading-none">Azan</span><strong className="text-[11px] font-mono font-bold my-0.5 leading-tight">{T(currentMasjid.schedule, 'zuhr', '12:35')}</strong><span className="text-[8.5px] text-slate-600 font-semibold mt-0.5 leading-none">Jamat</span><strong className="text-[11px] font-mono font-black text-amber-950 leading-tight">{T(currentMasjid.schedule, 'zuhrJamat', '01:00')}</strong></div>
+                        <div className="bg-[#fedfc7] text-slate-900 rounded-xl p-1 flex flex-col items-center"><span className="text-[11px] font-bold text-slate-800">Asr</span><div className="my-0.5 text-orange-600 text-base">🌤️</div><span className="text-[8.5px] text-slate-600 font-semibold leading-none">Azan</span><strong className="text-[11px] font-mono font-bold my-0.5 leading-tight">{T(currentMasjid.schedule, 'asr', '04:20')}</strong><span className="text-[8.5px] text-slate-600 font-semibold mt-0.5 leading-none">Jamat</span><strong className="text-[11px] font-mono font-black text-orange-950 leading-tight">{T(currentMasjid.schedule, 'asrJamat', '04:45')}</strong></div>
+                        <div className="bg-[#ffd7dc] text-slate-900 rounded-xl p-1 flex flex-col items-center"><span className="text-[11px] font-bold text-slate-800">Maghrib</span><div className="my-0.5 text-rose-600 text-base">🌇</div><span className="text-[8.5px] text-slate-600 font-semibold leading-none">Azan</span><strong className="text-[11px] font-mono font-bold my-0.5 leading-tight">{T(currentMasjid.schedule, 'maghrib', '05:50')}</strong><span className="text-[8.5px] text-slate-600 font-semibold mt-0.5 leading-none">Jamat</span><strong className="text-[11px] font-mono font-black text-rose-950 leading-tight">{T(currentMasjid.schedule, 'maghribJamat', '06:10')}</strong></div>
+                        <div className="bg-[#d2edfd] text-slate-900 rounded-xl p-1 flex flex-col items-center"><span className="text-[11px] font-bold text-slate-800">Isha</span><div className="my-0.5 text-sky-700 text-base">🌙</div><span className="text-[8.5px] text-slate-600 font-semibold leading-none">Azan</span><strong className="text-[11px] font-mono font-bold my-0.5 leading-tight">{T(currentMasjid.schedule, 'isha', '07:15')}</strong><span className="text-[8.5px] text-slate-600 font-semibold mt-0.5 leading-none">Jamat</span><strong className="text-[11px] font-mono font-black text-sky-950 leading-tight">{T(currentMasjid.schedule, 'ishaJamat', '07:45')}</strong></div>
                       </div>
                       
-                      <div className="grid grid-cols-3 gap-1.5 mt-2.5 text-center">
-                         <div className="bg-[#fff3c4] text-slate-900 rounded-2xl p-2 flex flex-col items-center shadow-xs"><span className="text-[10.5px] font-bold text-amber-950">Sunrise (तुलू)</span><div className="text-amber-500 text-xl my-0.5">🌄</div><strong className="text-xs font-mono font-bold">{T(currentMasjid.schedule, 'sunrise', '06:40')}</strong></div>
-                         <div className="bg-[#ffe4cc] text-slate-900 rounded-2xl p-2 flex flex-col items-center shadow-xs"><span className="text-[10.5px] font-bold text-orange-950">Sunset (ग़ुरूब)</span><div className="text-orange-500 text-xl my-0.5">🌇</div><strong className="text-xs font-mono font-bold">{T(currentMasjid.schedule, 'sunset', '05:45')}</strong></div>
-                         <div className="bg-[#bbf7d0] text-slate-900 rounded-2xl p-1.5 flex flex-col items-center border border-emerald-300 shadow-xs"><span className="text-[10.5px] font-bold text-emerald-950">Juma (जुमा)</span><div className="text-emerald-700 text-xl my-0.5">🕌</div><div className="flex justify-between w-full px-0.5"><div className="text-center"><span className="text-[8.5px] text-slate-600 block leading-none">Azan</span><strong className="text-[11px] font-mono font-bold">{T(currentMasjid.schedule, 'jumaAzan', '01:00')}</strong></div><div className="text-center"><span className="text-[8.5px] text-slate-600 block leading-none">Jamat</span><strong className="text-[11px] font-mono font-black text-emerald-950">{T(currentMasjid.schedule, 'jumaJamat', '01:30')}</strong></div></div></div>
+                      <div className="grid grid-cols-3 gap-1 mt-2 text-center">
+                         <div className="bg-[#fff3c4] text-slate-900 rounded-xl p-1.5 flex flex-col items-center shadow-xs"><span className="text-[10px] font-bold text-amber-950 leading-tight">Sunrise (तुलू)</span><div className="text-amber-500 text-base my-0.5">🌄</div><strong className="text-[11px] font-mono font-bold">{T(currentMasjid.schedule, 'sunrise', '06:40')}</strong></div>
+                         <div className="bg-[#ffe4cc] text-slate-900 rounded-xl p-1.5 flex flex-col items-center shadow-xs"><span className="text-[10px] font-bold text-orange-950 leading-tight">Sunset (ग़ुरूब)</span><div className="text-orange-500 text-base my-0.5">🌇</div><strong className="text-[11px] font-mono font-bold">{T(currentMasjid.schedule, 'sunset', '05:45')}</strong></div>
+                         <div className="bg-[#bbf7d0] text-slate-900 rounded-xl p-1 flex flex-col items-center border border-emerald-300 shadow-xs"><span className="text-[10px] font-bold text-emerald-950 leading-tight">Juma (जुमा)</span><div className="text-emerald-700 text-base my-0.5">🕌</div><div className="flex justify-between w-full px-0.5"><div className="text-center"><span className="text-[8px] text-slate-600 block leading-none">Azan</span><strong className="text-[10.5px] font-mono font-bold">{T(currentMasjid.schedule, 'jumaAzan', '01:00')}</strong></div><div className="text-center"><span className="text-[8px] text-slate-600 block leading-none">Jamat</span><strong className="text-[10.5px] font-mono font-black text-emerald-950">{T(currentMasjid.schedule, 'jumaJamat', '01:30')}</strong></div></div></div>
                       </div>
 
                       {/* WHATSAPP SHARE BUTTON: In Namaz card on Muqtadi Home page */}
                       <button
                         type="button"
                         onClick={() => shareMasjidWhatsApp(currentMasjid)}
-                        className="w-full mt-3 py-2.5 bg-[#25D366] hover:bg-[#20ba59] active:scale-95 text-white rounded-2xl font-bold text-xs flex items-center justify-center gap-1.5 shadow-sm transition"
+                        className="w-full mt-2 py-2 bg-[#25D366] hover:bg-[#20ba59] active:scale-95 text-white rounded-xl font-bold text-xs flex items-center justify-center gap-1.5 shadow-sm transition"
                       >
-                        <span className="text-base">📲</span>
+                        <span className="text-sm">📲</span>
                         <span>नमाज़ के औक़ात WhatsApp पर शेयर करें</span>
                       </button>
                     </div>
@@ -1204,7 +1350,34 @@
             {currentTab === 'profile' && (
               <main className="px-3.5 py-3 space-y-4 flex-1 z-0 pb-24">
                 {loggedImamMasjid ? (
-                  <div className="space-y-4 flex flex-col min-h-[calc(100vh-200px)]">
+                  <div className="space-y-3 flex flex-col min-h-[calc(100vh-200px)]">
+                    {/* LIVE FOLLOWERS CARD FOR IMAM */}
+                    <div className={`${darkMode ? 'bg-slate-800 border-slate-700' : 'bg-gradient-to-r from-[#0c4033] to-[#07382c] border-emerald-800 text-white'} p-3.5 px-4 rounded-3xl shadow-sm border flex items-center justify-between`}>
+                      <div className="flex items-center gap-3 min-w-0">
+                        <div className="w-10 h-10 rounded-2xl bg-amber-400/20 border border-amber-300/40 flex items-center justify-center text-xl shrink-0 shadow-inner">
+                          ⭐
+                        </div>
+                        <div className="min-w-0">
+                          <div className="flex items-center gap-1.5 flex-wrap">
+                            <span className="text-xs font-black tracking-wide text-amber-300">Live Followers</span>
+                            <span className="inline-flex items-center gap-1 bg-emerald-500/30 text-emerald-300 text-[9px] px-1.5 py-0.5 rounded-full font-black border border-emerald-400/30">
+                              <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-ping"></span>
+                              LIVE
+                            </span>
+                          </div>
+                          <p className="text-[11px] text-white/90 truncate mt-0.5">
+                            {(loggedImamMasjid.followersCount ?? loggedImamMasjid.favoritesCount ?? (favorites.includes(loggedImamMasjid.id) ? 1 : 0))} Muqtadi Starred this Masjid
+                          </p>
+                        </div>
+                      </div>
+                      <div className="text-right shrink-0 pl-2">
+                        <span className="text-2xl font-mono font-black text-amber-300 block leading-none">
+                          {(loggedImamMasjid.followersCount ?? loggedImamMasjid.favoritesCount ?? (favorites.includes(loggedImamMasjid.id) ? 1 : 0))}
+                        </span>
+                        <span className="text-[9px] font-bold text-emerald-200 block mt-1 uppercase tracking-wider">Muqtadi</span>
+                      </div>
+                    </div>
+
                     {/* WHITE CONTAINER: 2-COLUMN GRID OF 8 COMPACT MOBILE ACTION BUTTONS (NO ICONS) */}
                     <div className={`${darkMode ? 'bg-slate-800 border-slate-700' : 'bg-white border-slate-200'} p-4 sm:p-5 rounded-3xl shadow-sm border`}>
                       <div className="grid grid-cols-2 gap-3">
