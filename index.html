@@ -1216,7 +1216,7 @@
                         className="bg-transparent border-0 p-0 text-amber-400 hover:text-amber-300 transition shrink-0 active:scale-90 focus:outline-none"
                         title={favorites.includes(currentMasjid.id) ? "पसंदीदा से हटाएं" : "पसंदीदा बनाएं"}
                       >
-                        <svg className={`w-4 h-4 ${favorites.includes(currentMasjid.id) ? 'fill-amber-400 text-amber-400' : 'fill-transparent text-white/80 stroke-current'}`} viewBox="0 0 24 24">
+                        <svg className={`w-5 h-5 ${favorites.includes(currentMasjid.id) ? 'fill-amber-400 text-amber-400' : 'fill-transparent text-white/80 stroke-current'}`} viewBox="0 0 24 24">
                           <path strokeWidth="2" d="M12 17.27L18.18 21l-1.64-7.03L22 9.24l-7.19-.61L12 2 9.19 8.63 2 9.24l5.46 4.73L5.82 21z" />
                         </svg>
                       </button>
@@ -1233,19 +1233,19 @@
                     </div>
                   </div>
 
-                  {/* Right Action Icons: ONLY 2 ICONS (Notification Bell + Theme Toggle) */}
-                  <div className="flex flex-col items-center gap-1 shrink-0">
-                    <button onClick={() => { const all = currentMasjid.notifications || []; setNotifModalItems(all.filter(n => !readNotificationIds.includes(n.id))); if (all.length) { const u = Array.from(new Set([...readNotificationIds, ...all.map(n => n.id)])); setReadNotificationIds(u); safeStorageSet('mc_read_notifs', JSON.stringify(u)); } setShowNotificationsModal(true); }} aria-label="सूचनाएं" className="w-[28px] h-[28px] rounded-full bg-white/10 flex justify-center items-center relative hover:bg-white/20 active:scale-95 transition">
-                      <svg className="w-3.5 h-3.5 text-white" fill="currentColor" viewBox="0 0 24 24"><path d="M12 22c1.1 0 2-.9 2-2h-4c0 1.1.9 2 2 2zm6-6v-5c0-3.07-1.63-5.64-4.5-6.32V4c0-.83-.67-1.5-1.5-1.5s-1.5.67-1.5 1.5v.68C7.64 5.36 6 7.92 6 11v5l-2 2v1h16v-1l-2-2z"/></svg>
-                      {unreadNotificationCount > 0 && <span className="absolute -top-1 -right-1 min-w-[14px] h-[14px] rounded-full bg-rose-600 text-[8.5px] font-black flex items-center justify-center animate-pulse px-0.5 border border-[#07382c]">{unreadNotificationCount}</span>}
+                  {/* Right Action Icons: ONLY 2 ICONS (Notification Bell + Theme Toggle) - Enlarged & Balanced */}
+                  <div className="flex flex-col items-center gap-1.5 shrink-0">
+                    <button onClick={() => { const all = currentMasjid.notifications || []; setNotifModalItems(all.filter(n => !readNotificationIds.includes(n.id))); if (all.length) { const u = Array.from(new Set([...readNotificationIds, ...all.map(n => n.id)])); setReadNotificationIds(u); safeStorageSet('mc_read_notifs', JSON.stringify(u)); } setShowNotificationsModal(true); }} aria-label="सूचनाएं" className="w-[35px] h-[35px] rounded-full bg-white/15 flex justify-center items-center relative hover:bg-white/25 active:scale-95 transition shadow-sm">
+                      <svg className="w-[18px] h-[18px] text-white" fill="currentColor" viewBox="0 0 24 24"><path d="M12 22c1.1 0 2-.9 2-2h-4c0 1.1.9 2 2 2zm6-6v-5c0-3.07-1.63-5.64-4.5-6.32V4c0-.83-.67-1.5-1.5-1.5s-1.5.67-1.5 1.5v.68C7.64 5.36 6 7.92 6 11v5l-2 2v1h16v-1l-2-2z"/></svg>
+                      {unreadNotificationCount > 0 && <span className="absolute -top-1 -right-1 min-w-[16px] h-[16px] rounded-full bg-rose-600 text-[9px] font-black flex items-center justify-center animate-pulse px-0.5 border border-[#07382c] shadow">{unreadNotificationCount}</span>}
                     </button>
-                    <button onClick={toggleDarkMode} className="w-[28px] h-[28px] rounded-full bg-white/10 text-xs flex justify-center items-center hover:bg-white/20 active:scale-95 transition">{darkMode ? '☀️' : '🎨'}</button>
+                    <button onClick={toggleDarkMode} className="w-[35px] h-[35px] rounded-full bg-white/15 text-base flex justify-center items-center hover:bg-white/25 active:scale-95 transition shadow-sm">{darkMode ? '☀️' : '🎨'}</button>
                   </div>
                 </div>
               ) : (
                 <div className="flex justify-between items-center w-full">
                   <div className="flex items-center gap-3"><div className="w-10 h-10 rounded-full bg-emerald-900 border-2 border-amber-400 flex justify-center items-center text-xl">🕌</div><div><h1 className="text-sm font-black uppercase">मस्जिद कनेक्ट</h1><p className="text-[10px] text-amber-200">स्मार्ट लाइव नेटवर्क</p></div></div>
-                  <button onClick={toggleDarkMode} className="w-7 h-7 rounded-full bg-white/10 text-sm">{darkMode ? '☀️' : '🎨'}</button>
+                  <button onClick={toggleDarkMode} className="w-[35px] h-[35px] rounded-full bg-white/15 text-base flex items-center justify-center hover:bg-white/25 active:scale-95 transition">{darkMode ? '☀️' : '🎨'}</button>
                 </div>
               )}
             </header>
