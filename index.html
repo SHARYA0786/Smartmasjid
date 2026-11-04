@@ -1194,17 +1194,17 @@
             )}
 
             {/* HEADER */}
-            <header className="bg-[#07382c] text-white px-3 py-2 rounded-b-2xl shadow-md relative z-10 border-b border-amber-500/20">
+            <header className="bg-[#07382c] text-white px-3 py-4 rounded-b-2xl shadow-md relative z-10 border-b border-amber-500/20">
               {currentMasjid ? (
                 <div className="flex items-center gap-2.5 w-full min-w-0">
                   {/* Square Profile Photo with Gold Border */}
-                  <div className="w-[58px] h-[72px] rounded-xl overflow-hidden border-2 border-amber-400 shrink-0 shadow-lg bg-emerald-950 relative">
+                  <div className="w-[70px] h-[85px] rounded-xl overflow-hidden border-2 border-amber-400 shrink-0 shadow-lg bg-emerald-950 relative">
                     <img src={currentMasjid.photo || 'https://images.unsplash.com/photo-1542816417-0983c9c9ad53?auto=format&fit=crop&w=800&q=80'} alt={currentMasjid.name} className="w-full h-full object-cover" />
                     {currentMasjid.isLive && <span className="absolute inset-0 bg-rose-600/40 flex justify-center items-center text-[10px] font-black animate-pulse">LIVE</span>}
                   </div>
 
                   {/* Center Title (3-line layout) */}
-                  <div className="flex-1 min-w-0 pr-1">
+                  <div className="flex-1 min-w-0 pr-1 -mt-1.5 flex flex-col justify-center">
                     {/* Line 1: Mosque Name + Small Star Toggle without background */}
                     <div className="flex items-center gap-1.5 flex-wrap">
                       <h1 className="font-masjid text-xl sm:text-2xl font-black uppercase text-amber-300 tracking-wide truncate drop-shadow-sm leading-tight">
@@ -1222,13 +1222,13 @@
                       </button>
                     </div>
 
-                    {/* Line 2: Mohalla / Address (Clean white text) */}
-                    <div className="text-[11px] font-bold text-white tracking-wide uppercase truncate mt-0.5 leading-snug">
+                    {/* Line 2: Mohalla / Address (Clean white text - larger font) */}
+                    <div className="text-[12.5px] sm:text-[13px] font-bold text-white tracking-wide uppercase truncate mt-0.5 leading-snug">
                       {currentMasjid.address || 'मोहल्ला'}
                     </div>
 
-                    {/* Line 3: City / State (Subtle mint-green/white font) */}
-                    <div className="text-[10px] text-emerald-200/90 font-medium truncate leading-snug">
+                    {/* Line 3: City / State (Mint-green text - larger font) */}
+                    <div className="text-[11.5px] sm:text-[12px] text-emerald-200 font-semibold truncate leading-snug mt-0.5">
                       {currentMasjid.stateLocation || currentMasjid.stateName || 'स्थान'}
                     </div>
                   </div>
@@ -1332,7 +1332,7 @@
                               <div className="flex items-center gap-1.5 pt-0.5 border-t border-slate-100 dark:border-slate-700/60">
                                 <span className="text-xs text-sky-600">🌙</span>
                                 <div>
-                                  <span className="text-[9.5px] text-slate-500 dark:text-slate-400 font-medium block leading-none">सहरी (Sehri)</span>
+                                  <span className="text-[9.5px] text-slate-500 dark:text-slate-400 font-medium block leading-none">Sehri</span>
                                   <strong className="text-xs font-mono font-black text-sky-700 dark:text-sky-300 block leading-tight">
                                     {t12('sehri', rz.sehri || sch0.fajr)}
                                   </strong>
@@ -1354,7 +1354,7 @@
                               <div className="flex items-center gap-1.5 pt-0.5 border-t border-slate-100 dark:border-slate-700/60">
                                 <span className="text-xs text-amber-500">🌇</span>
                                 <div>
-                                  <span className="text-[9.5px] text-slate-500 dark:text-slate-400 font-medium block leading-none">इफ़्तार (Iftar)</span>
+                                  <span className="text-[9.5px] text-slate-500 dark:text-slate-400 font-medium block leading-none">Iftar</span>
                                   <strong className="text-xs font-mono font-black text-amber-600 dark:text-amber-400 block leading-tight">
                                     {t12('iftar', rz.iftar || sch0.maghrib)}
                                   </strong>
