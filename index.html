@@ -19,6 +19,10 @@
     <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
     <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
 
+    <!-- Google Firebase SDK (Official GStatic Compat CDN) -->
+    <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore-compat.js"></script>
+
     <!-- MQTT Cloud Network -->
     <script src="https://cdn.jsdelivr.net/npm/mqtt@5.16.1/dist/mqtt.min.js"></script>
 
@@ -50,6 +54,30 @@
 
     <script type="text/babel">
       const { useState, useEffect, useMemo, useRef } = React;
+
+      // GOOGLE FIREBASE CLOUD DATABASE (Permanent 24/7 Cloud Storage)
+      const firebaseConfig = {
+        apiKey: "AIzaSyDjEqIENseu6WzNWh6cIMlN_a3ywcYlw9E",
+        authDomain: "masjidconnect-24fde.firebaseapp.com",
+        projectId: "masjidconnect-24fde",
+        storageBucket: "masjidconnect-24fde.firebasestorage.app",
+        messagingSenderId: "439393157416",
+        appId: "1:439393157416:web:47ceabcbbfee746257101d",
+        measurementId: "G-24WKQRX2GT"
+      };
+
+      let firestoreDb = null;
+      try {
+        if (typeof firebase !== 'undefined') {
+          if (!firebase.apps || !firebase.apps.length) {
+            firebase.initializeApp(firebaseConfig);
+          }
+          firestoreDb = firebase.firestore();
+          try { firestoreDb.enablePersistence({ synchronizeTabs: true }).catch(() => {}); } catch(e) {}
+        }
+      } catch (err) {
+        console.warn('Firebase init warning:', err);
+      }
 
       // GLOBAL REALTIME CLOUD NETWORK (v12 - Clears Old Corrupted Cache)
       const MQTT_PRIMARY_WS = 'wss://broker.emqx.io:8084/mqtt';
@@ -339,17 +367,8 @@
         </button>
       );
       const RouteButton = ({ m }) => (
-        <a 
-          href={`https://www.google.com/maps/dir/?api=1&destination=${m.lat},${m.lng}`} 
-          target="_blank" 
-          rel="noopener noreferrer" 
-          onClick={(e) => e.stopPropagation()} 
-          aria-label="Google Maps से रास्ता" 
-          className={`${pillBase} bg-white dark:bg-slate-800 border-rose-300 dark:border-rose-800/60 text-rose-600 dark:text-rose-400 hover:bg-rose-50 active:scale-95`}
-        >
-          <svg className="w-[18px] h-[18px]" viewBox="0 0 24 24" fill="currentColor">
-            <path d="M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7zm0 9.5a2.5 2.5 0 0 1 0-5 2.5 2.5 0 0 1 0 5z"/>
-          </svg>
+        <a href={`https://www.google.com/maps/dir/?api=1&destination=${m.lat},${m.lng}`} target="_blank" rel="noopener noreferrer" onClick={(e) => e.stopPropagation()} aria-label="Google Maps से रास्ता" className={`${pillBase} bg-gradient-to-br from-emerald-600 to-[#07382c] border-amber-300/50 text-white`}>
+          <svg className="w-[18px] h-[18px] text-amber-300" viewBox="0 0 24 24" fill="currentColor"><path d="M21.71 11.29l-9-9a1 1 0 00-1.42 0l-9 9a1 1 0 000 1.42l9 9a1 1 0 001.42 0l9-9a1 1 0 00-1.42zM14 14.5V12h-4v3H8v-4a1 1 0 011-1h5V7.5l3.5 3.5-3.5 3.5z" /></svg>
         </a>
       );
       const InfoRow = ({ label, value }) => (value ? <div className="flex justify-between gap-3 text-[13px]"><span className="text-slate-500 shrink-0">{label}</span><b className="text-right break-words">{value}</b></div> : null);
@@ -613,29 +632,61 @@
         stateRef.current = { favorites, loggedImamMasjidId, isImamLive, activeListeningMasjidId, masjids, showToast, liveAzanOn };
         const alertedSessionsRef = useRef({});
 
+        // GOOGLE FIREBASE FIRESTORE 24/7 PERMANENT CLOUD SYNC
+        useEffect(() => {
+          if (!firestoreDb) return;
+          let unsubscribe = null;
+          try {
+            unsubscribe = firestoreDb.collection('masjids').onSnapshot((snapshot) => {
+              setMasjids(prev => {
+                let changed = false;
+                const next = { ...prev };
+                snapshot.docChanges().forEach((change) => {
+                  const id = change.doc.id;
+                  if (change.type === 'removed') {
+                    if (next[id]) {
+                      delete next[id];
+                      changed = true;
+                    }
+                  } else {
+                    const cloudData = change.doc.data();
+                    if (cloudData && cloudData.id) {
+                      const ex = next[id];
+                      if (!ex || (cloudData.updatedAt || 0) >= (ex.updatedAt || 0)) {
+                        next[id] = { ...ex, ...cloudData };
+                        changed = true;
+                      }
+                    }
+                  }
+                });
+                if (changed) {
+                  safeStorageSet('mc_db_v12', JSON.stringify(next));
+                  return next;
+                }
+                return prev;
+              });
+            }, (err) => {
+              console.warn('Firestore snapshot notice (create Firestore database in Firebase console):', err);
+            });
+          } catch (e) {
+            console.warn('Firestore listener error:', e);
+          }
+          return () => { if (unsubscribe) { try { unsubscribe(); } catch(e) {} } };
+        }, []);
+
         useEffect(() => {
           if (!mqttClient) return;
-          let seenIds = new Set(); let pruneTimer = null; let republishTimer = null;
+          let republishTimer = null;
           const persist = (obj) => safeStorageSet('mc_db_v12', JSON.stringify(obj));
 
           const handleConnect = () => {
             setCloudOnline(true);
-            seenIds = new Set();
             mqttClient.subscribe([ TOPIC_DB_PREFIX + '+', TOPIC_EVENTS, TOPIC_LIVE_AZAN, TOPIC_AUDIO_PREFIX + '+' ], { qos: 1 });
-            clearTimeout(republishTimer); clearTimeout(pruneTimer);
+            clearTimeout(republishTimer);
             republishTimer = setTimeout(() => {
               const s = stateRef.current; const mine = s.loggedImamMasjidId && s.masjids[s.loggedImamMasjidId];
               if (mine && mqttClient.connected) mqttClient.publish(`${TOPIC_DB_PREFIX}${mine.id}`, JSON.stringify(mine), { retain: true, qos: 0 });
             }, 2500);
-            pruneTimer = setTimeout(() => {
-              if (!mqttClient.connected || seenIds.size === 0) return;
-              const ownId = stateRef.current.loggedImamMasjidId;
-              setMasjids(prev => {
-                const u = { ...prev }; let changed = false;
-                Object.keys(u).forEach(id => { if (!seenIds.has(id) && id !== ownId) { delete u[id]; changed = true; } });
-                if (!changed) return prev; persist(u); return u;
-              });
-            }, 6000);
           };
           const handleOffline = () => setCloudOnline(false);
           mqttClient.on('connect', handleConnect);
@@ -778,6 +829,17 @@
             if (isDelete) delete updated[deletedId]; else updated[singleMasjidObj.id] = singleMasjidObj;
             safeStorageSet('mc_db_v12', JSON.stringify(updated)); return updated;
           });
+          // 1. Google Firebase Firestore Permanent Cloud Database
+          if (firestoreDb) {
+            try {
+              if (isDelete && deletedId) {
+                firestoreDb.collection('masjids').doc(deletedId).delete().catch(() => {});
+              } else if (singleMasjidObj && singleMasjidObj.id) {
+                firestoreDb.collection('masjids').doc(singleMasjidObj.id).set(singleMasjidObj, { merge: true }).catch(() => {});
+              }
+            } catch (e) {}
+          }
+          // 2. Realtime MQTT Broadcast
           if (mqttClient && mqttClient.connected) {
             if (isDelete) { mqttClient.publish(`${TOPIC_DB_PREFIX}${deletedId}`, "", { retain: true, qos: 1 }); mqttClient.publish(TOPIC_EVENTS, JSON.stringify({ type: 'MASJID_DELETED', deletedId }), { qos: 1 }); } 
             else mqttClient.publish(`${TOPIC_DB_PREFIX}${singleMasjidObj.id}`, JSON.stringify(singleMasjidObj), { retain: true, qos: 1 });
@@ -797,6 +859,9 @@
             const updatedMasjid = { ...target, followersCount: nextCount, updatedAt: Date.now() };
             const updatedMap = { ...prev, [id]: updatedMasjid };
             safeStorageSet('mc_db_v12', JSON.stringify(updatedMap));
+            if (firestoreDb) {
+              try { firestoreDb.collection('masjids').doc(id).set({ followersCount: nextCount, updatedAt: Date.now() }, { merge: true }).catch(() => {}); } catch(e) {}
+            }
             return updatedMap;
           });
 
@@ -932,9 +997,17 @@
           if (idChanged) {
             const oldId = target.id;
             setMasjids(prev => { const u = { ...prev }; delete u[oldId]; u[finalId] = updatedMasjid; safeStorageSet('mc_db_v12', JSON.stringify(u)); return u; });
-            mqttClient.publish(`${TOPIC_DB_PREFIX}${oldId}`, "", { retain: true, qos: 1 });
-            mqttClient.publish(`${TOPIC_DB_PREFIX}${finalId}`, JSON.stringify(updatedMasjid), { retain: true, qos: 1 });
-            mqttClient.publish(TOPIC_EVENTS, JSON.stringify({ type: 'MASJID_ID_CHANGED', oldId, newId: finalId }), { qos: 1 });
+            if (firestoreDb) {
+              try {
+                firestoreDb.collection('masjids').doc(oldId).delete().catch(() => {});
+                firestoreDb.collection('masjids').doc(finalId).set(updatedMasjid).catch(() => {});
+              } catch(e) {}
+            }
+            if (mqttClient && mqttClient.connected) {
+              mqttClient.publish(`${TOPIC_DB_PREFIX}${oldId}`, "", { retain: true, qos: 1 });
+              mqttClient.publish(`${TOPIC_DB_PREFIX}${finalId}`, JSON.stringify(updatedMasjid), { retain: true, qos: 1 });
+              mqttClient.publish(TOPIC_EVENTS, JSON.stringify({ type: 'MASJID_ID_CHANGED', oldId, newId: finalId }), { qos: 1 });
+            }
             setLoggedImamMasjidId(finalId); safeStorageSet('mc_logged_imam_masjid_id', finalId);
             setSelectedMasjidId(prev => { if (prev !== oldId) return prev; safeStorageSet('mc_selected_masjid_id', finalId); return finalId; });
             setFavorites(prev => { const n = prev.map(x => (x === oldId ? finalId : x)); safeStorageSet('mc_user_favorites', JSON.stringify(n)); return n; });
@@ -950,7 +1023,7 @@
         const toggleFacility = (f) => setInfoDraft(prev => { const cur = prev.facilities || []; return { ...prev, facilities: cur.includes(f) ? cur.filter(x => x !== f) : [...cur, f] }; });
         const handleQrUpload = (e) => {
           const file = e.target.files && e.target.files[0]; if (!file) return;
-          compressImageFile(file, 800, 0.88).then((url) => { setD('upiQr', url); showToast('✅ QR फोटो सेलेक्ट हुई'); }).catch(() => showToast('फ़ोटो नहीं खुल सकी', 'error'));
+          compressImageFile(file, 400, 0.70).then((url) => { setD('upiQr', url); showToast('✅ QR फोटो सेलेक्ट हुई'); }).catch(() => showToast('फ़ोटो नहीं खुल सकी', 'error'));
         };
         const handleSaveInfo = (e) => {
           e.preventDefault(); const target = masjids[loggedImamMasjidId]; if (!target) return;
