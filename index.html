@@ -350,7 +350,7 @@
         qrPhoto: ''          // optional: apne QR ki photo ka data-URL ya link
       };
       const APP_VERSION = 'v1.0';
-      const APP_SHARE_LINK = '';   // yahan apna ऐप ka link (GitHub Pages) likhein - WhatsApp share me judega
+      const APP_SHARE_LINK = 'https://www.appcreator24.com/app4234788-mq0opg';   // App download link - WhatsApp share me judega
       const FACILITIES = ['औरतों का हिस्सा', 'वुज़ूख़ाना', 'पार्किंग', 'व्हीलचेयर', 'क़ब्रिस्तान', 'जनाज़ा सेवा'];
       const upiLink = (upi, name, amt) => `upi://pay?pa=${encodeURIComponent(upi)}&pn=${encodeURIComponent(name || '')}&cu=INR${amt ? '&am=' + amt : ''}`;
 
@@ -481,23 +481,26 @@
         );
       };
 
-      const LocationPicker = ({ lat, lng, onChange }) => {
+      const LocationPicker = ({ lat, lng, onChange, height = 320 }) => {
         const elRef = useRef(null); const mapRef = useRef(null); const markerRef = useRef(null);
         useEffect(() => {
           if (!window.L || !elRef.current || mapRef.current) return;
           const L = window.L;
           const map = L.map(elRef.current, {
             maxZoom: 20,
-            zoomSnap: 0.25,
-            zoomDelta: 0.5,
-            wheelPxPerZoomLevel: 75,
-            wheelDebounceTime: 40,
+            zoomSnap: 0.1,
+            zoomDelta: 0.25,
+            wheelPxPerZoomLevel: 100,
+            wheelDebounceTime: 20,
             zoomAnimation: true,
+            zoomAnimationThreshold: 8,
             fadeAnimation: true,
             scrollWheelZoom: true,
             touchZoom: true,
-            bounceAtZoomLimits: true
+            bounceAtZoomLimits: true,
+            zoomControl: false // custom smooth controls
           }).setView([lat, lng], 17);
+
           const googleHybrid = L.tileLayer('https://{s}.google.com/vt/lyrs=y&x={x}&y={y}&z={z}', {
             maxZoom: 20,
             subdomains: ['mt0', 'mt1', 'mt2', 'mt3'],
@@ -505,7 +508,8 @@
           });
           googleHybrid.addTo(map);
           map.setMaxZoom(20);
-          const icon = L.divIcon({ html: '<div style="font-size:32px;line-height:32px;margin-top:-30px;margin-left:-16px">📍</div>', className: '', iconSize: [0, 0] });
+
+          const icon = L.divIcon({ html: '<div style="font-size:34px;line-height:34px;margin-top:-32px;margin-left:-17px;filter:drop-shadow(0 2px 4px rgba(0,0,0,0.6));">📍</div>', className: '', iconSize: [0, 0] });
           const marker = L.marker([lat, lng], { draggable: true, icon }).addTo(map);
           marker.on('dragend', () => { const q = marker.getLatLng(); onChange(q.lat, q.lng); });
           map.on('click', (ev) => { marker.setLatLng(ev.latlng); onChange(ev.latlng.lat, ev.latlng.lng); });
@@ -518,12 +522,35 @@
           markerRef.current.setLatLng([lat, lng]);
           if (!mapRef.current.getBounds().contains([lat, lng])) mapRef.current.setView([lat, lng], 17);
         }, [lat, lng]);
+
+        const handleZoomIn = (e) => { e.preventDefault(); e.stopPropagation(); if (mapRef.current) mapRef.current.zoomIn(0.5); };
+        const handleZoomOut = (e) => { e.preventDefault(); e.stopPropagation(); if (mapRef.current) mapRef.current.zoomOut(0.5); };
+
         if (!window.L) return <div className="p-3 text-center text-[11px] text-rose-500 border rounded-xl">मैप लोड नहीं हुआ (इंटरनेट जाँचें)। नीचे GPS बटन से लोकेशन लगा सकते हैं।</div>;
         return (
-          <div className="relative">
-            <div ref={elRef} style={{ height: 260, isolation: 'isolate' }} className="rounded-xl border overflow-hidden shadow-inner" />
-            <div className="absolute top-2 right-2 z-[400] bg-black/70 text-white text-[10px] font-bold px-2 py-0.5 rounded shadow pointer-events-none">
+          <div className="relative rounded-2xl overflow-hidden border border-emerald-300 dark:border-emerald-700 shadow-md">
+            <div ref={elRef} style={{ height: height, isolation: 'isolate' }} className="w-full" />
+            <div className="absolute top-2.5 right-2.5 z-[400] bg-black/75 backdrop-blur-xs text-white text-[10.5px] font-bold px-2.5 py-1 rounded-full shadow pointer-events-none border border-white/20">
               🛰️ Google Satellite Map
+            </div>
+            {/* Quick Smooth Zoom Buttons for Easy Mobile Use */}
+            <div className="absolute bottom-2.5 right-2.5 z-[400] flex flex-col gap-1.5 shadow-lg">
+              <button
+                type="button"
+                onClick={handleZoomIn}
+                aria-label="Zoom in"
+                className="w-8 h-8 rounded-xl bg-white/90 dark:bg-slate-800/90 text-slate-800 dark:text-white font-black text-base flex items-center justify-center border border-slate-300 dark:border-slate-600 hover:bg-white active:scale-95 transition backdrop-blur-xs"
+              >
+                +
+              </button>
+              <button
+                type="button"
+                onClick={handleZoomOut}
+                aria-label="Zoom out"
+                className="w-8 h-8 rounded-xl bg-white/90 dark:bg-slate-800/90 text-slate-800 dark:text-white font-black text-base flex items-center justify-center border border-slate-300 dark:border-slate-600 hover:bg-white active:scale-95 transition backdrop-blur-xs"
+              >
+                −
+              </button>
             </div>
           </div>
         );
@@ -1172,7 +1199,15 @@
             m.dailyHadith ? `\n📖 आज की हदीस:\n${m.dailyHadith}${m.dailyHadithRef ? ' ' + m.dailyHadithRef : ''}` : null,
             APP_SHARE_LINK ? `\n📲 ऐप का लिंक: ${APP_SHARE_LINK}` : null
           ];
-          window.open('https://wa.me/?text=' + encodeURIComponent(parts.filter(x => x !== null).join('\n')), '_blank');
+          const shareText = parts.filter(x => x !== null).join('\n');
+          const waAppUrl = `whatsapp://send?text=${encodeURIComponent(shareText)}`;
+          const waWebUrl = `https://api.whatsapp.com/send?text=${encodeURIComponent(shareText)}`;
+          try {
+            // Mobile par seedha WhatsApp App khulega (browser nahi khulega)
+            window.location.href = waAppUrl;
+          } catch (e) {
+            window.open(waWebUrl, '_blank');
+          }
         };
 
         const handleDirectLoginFromRecovery = (mId) => {
@@ -1987,15 +2022,6 @@
                       <div><input name="mPhone" type="tel" defaultValue={loggedImamMasjid?.phone || ''} placeholder="Phone Number (e.g. 9876543210) *" required className="w-full p-2.5 border rounded-xl dark:bg-slate-700 dark:border-slate-600" /></div>
                       <div><input name="mImam" defaultValue={loggedImamMasjid?.imamName || ''} placeholder="Imam Name (e.g. Maulana Ahmad) *" required className="w-full p-2.5 border rounded-xl dark:bg-slate-700 dark:border-slate-600" /></div>
                     </div>
-                    <div className="pt-1">
-                      <div className="text-slate-500 font-bold text-xs mb-1">📍 Mosque Location on Map</div>
-                      <LocationPicker lat={parseFloat(editLat) || 28.6139} lng={parseFloat(editLng) || 77.2090} onChange={(a, b) => { setEditLat(a); setEditLng(b); }} />
-                      <p className="text-[10px] text-slate-500 mt-1">Tap on map or drag 📍 to place on mosque roof.</p>
-                      <div className="flex items-center justify-between gap-2 mt-1">
-                        <span className="text-[10px] font-mono text-emerald-700">{Number(editLat).toFixed(5)}, {Number(editLng).toFixed(5)}</span>
-                        <button type="button" onClick={handleFetchEditGpsLocation} className="px-3 py-1.5 bg-emerald-50 dark:bg-emerald-900/30 text-emerald-800 dark:text-emerald-400 border border-emerald-200 dark:border-emerald-800 rounded-lg text-[11px] font-bold">📍 Use My Current GPS</button>
-                      </div>
-                    </div>
                     <div className="pt-2 border-t dark:border-slate-700 space-y-2">
                       <div className="font-bold text-slate-500 text-xs">🔐 Login Credentials (Optional Change)</div>
                       <div><input name="mNewId" defaultValue={loggedImamMasjid?.id || ''} placeholder="Mosque ID (e.g. MASJID-101)" className="w-full p-2.5 border rounded-xl dark:bg-slate-700 dark:border-slate-600 font-mono uppercase" /></div>
@@ -2004,6 +2030,20 @@
                       </div>
                       <div><input name="mCurPass" type="password" autoComplete="off" placeholder="Current Password (required to change ID or Password)" className="w-full p-2.5 border rounded-xl dark:bg-slate-700 dark:border-slate-600" /></div>
                       <p className="text-[10px] text-amber-700 dark:text-amber-400">If ID is changed, login again with new ID. Old ID will be deactivated.</p>
+                    </div>
+
+                    {/* LOCATION AT THE VERY BOTTOM OF EDIT PROFILE WITH SATELLITE GOOGLE MAP */}
+                    <div className="pt-2 border-t dark:border-slate-700 space-y-1.5">
+                      <div className="flex justify-between items-center">
+                        <span className="font-extrabold text-emerald-950 dark:text-emerald-300 text-xs">📍 Mosque Location on Satellite Map</span>
+                        <button type="button" onClick={handleFetchEditGpsLocation} className="px-2.5 py-1 bg-[#07382c] text-white rounded-lg text-[10px] font-bold">🔄 Refresh GPS</button>
+                      </div>
+                      <LocationPicker lat={parseFloat(editLat) || 28.6139} lng={parseFloat(editLng) || 77.2090} onChange={(a, b) => { setEditLat(a); setEditLng(b); }} height={320} />
+                      <p className="text-[10px] text-slate-500">Tap on map or drag 📍 to place on mosque roof.</p>
+                      <div className="flex items-center justify-between gap-2 p-1.5 bg-emerald-50 dark:bg-slate-700/60 rounded-xl border border-emerald-100 dark:border-slate-600">
+                        <span className="text-[10px] font-mono font-bold text-emerald-800 dark:text-emerald-300">{Number(editLat).toFixed(5)}, {Number(editLng).toFixed(5)}</span>
+                        <span className="text-[9.5px] text-slate-500 font-semibold">उपग्रह (Satellite) व्यू</span>
+                      </div>
                     </div>
                     <div className="flex gap-2 pt-2"><button type="button" onClick={() => setShowEditProfileModal(false)} className="w-1/2 py-2.5 bg-slate-100 dark:bg-slate-700 rounded-xl font-bold">Cancel</button><button type="submit" className="w-1/2 py-2.5 bg-[#07382c] text-white rounded-xl font-bold shadow">Save Profile</button></div>
                   </form>
