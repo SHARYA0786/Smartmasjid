@@ -421,6 +421,36 @@
         </button>
       );
 
+      const openNativeWhatsApp = (phone, text) => {
+        const cleanPhone = (phone || '').replace(/[^0-9]/g, '');
+        const encText = encodeURIComponent(text || '');
+        const ua = (navigator.userAgent || '').toLowerCase();
+        const isAndroid = ua.includes('android');
+
+        if (isAndroid) {
+          // Direct Intent to native WhatsApp app on Android & AppCreator24 WebView
+          // ZERO browser feel - bypasses Chrome / browser tabs completely!
+          try {
+            window.location.href = `intent://send?phone=${cleanPhone}&text=${encText}#Intent;scheme=whatsapp;package=com.whatsapp;end;`;
+            return;
+          } catch (e) {
+            window.location.href = `whatsapp://send?phone=${cleanPhone}&text=${encText}`;
+            return;
+          }
+        }
+
+        // Direct app URL for iOS / other devices
+        try {
+          window.location.href = `whatsapp://send?phone=${cleanPhone}&text=${encText}`;
+          setTimeout(() => {
+            if (document.hidden) return;
+            window.open(`https://wa.me/${cleanPhone}?text=${encText}`, '_blank');
+          }, 600);
+        } catch (e) {
+          window.open(`https://wa.me/${cleanPhone}?text=${encText}`, '_blank');
+        }
+      };
+
       const InfoRow = ({ label, value }) => (value ? <div className="flex justify-between gap-3 text-[13px]"><span className="text-slate-500 shrink-0">{label}</span><b className="text-right break-words">{value}</b></div> : null);
 
       // ---- Ramzan helpers ----
@@ -654,6 +684,10 @@
         });
         const [newNoticeTitle, setNewNoticeTitle] = useState('');
         const [newNoticeMessage, setNewNoticeMessage] = useState('');
+        const [isRefreshing, setIsRefreshing] = useState(false);
+        const [pullDistance, setPullDistance] = useState(0);
+        const touchStartYRef = useRef(0);
+        const isPullingRef = useRef(false);
 
         // Real-Time States
         const [liveBroadcasts, setLiveBroadcasts] = useState({});
@@ -1277,15 +1311,114 @@
 
           const adminNum = '918084329613';
           const msg = `अस्सलाम वालेकुम एडमिन साहब, मुझे मस्जिद [${m.name}] (ID: ${m.id}) का पासवर्ड रीसेट करवाना है। रजिस्टर्ड मोबाइल नंबर: ${m.phone}। कृपया मेरा पासवर्ड भेजें।`;
-          const waUrl = `https://wa.me/${adminNum}?text=${encodeURIComponent(msg)}`;
-
-          try { window.location.href = waUrl; } catch (err) { window.open(waUrl, '_blank'); }
-          showToast('✅ पासवर्ड रीसेट का SMS अनुरोध एडमिन को भेज दिया गया!');
+          openNativeWhatsApp(adminNum, msg);
+          showToast('✅ पासवर्ड रीसेट का अनुरोध WhatsApp पर तैयार है!');
         };
 
+        const handleRefresh = () => {
+          setIsRefreshing(true);
+          setPullDistance(52);
+          if (navigator.vibrate) {
+            try { navigator.vibrate(35); } catch (e) {}
+          }
+
+          // 1. Fresh sync from Firestore
+          if (firestoreDb) {
+            try {
+              firestoreDb.collection('masjids').get({ source: 'server' }).then((snapshot) => {
+                setMasjids(prev => {
+                  const next = { ...prev };
+                  snapshot.forEach(doc => {
+                    next[doc.id] = { id: doc.id, ...doc.data() };
+                  });
+                  safeStorageSet('mc_db_v12', JSON.stringify(next));
+                  return next;
+                });
+              }).catch(() => {});
+            } catch (e) {}
+          }
+
+          // 2. Refresh GPS Location
+          if (hasGps) {
+            handleFetchGpsLocation(true);
+          }
+
+          // 3. Update current time
+          setCurrentTime(new Date());
+
+          setTimeout(() => {
+            setIsRefreshing(false);
+            setPullDistance(0);
+            showToast('✅ ताज़ा डेटा सफलतापूर्वक अपडेट हो गया!');
+          }, 700);
+        };
+
+        const handleTouchStart = (e) => {
+          if (isRefreshing) return;
+          const currentScroll = window.scrollY || document.documentElement.scrollTop || 0;
+          if (currentScroll <= 2) {
+            touchStartYRef.current = e.touches[0].clientY;
+            isPullingRef.current = true;
+          } else {
+            isPullingRef.current = false;
+          }
+        };
+
+        const handleTouchMove = (e) => {
+          if (!isPullingRef.current || isRefreshing) return;
+          const currentScroll = window.scrollY || document.documentElement.scrollTop || 0;
+          if (currentScroll > 2) {
+            isPullingRef.current = false;
+            setPullDistance(0);
+            return;
+          }
+          const currentY = e.touches[0].clientY;
+          const diff = currentY - touchStartYRef.current;
+          if (diff > 0) {
+            const pull = Math.min(80, Math.pow(diff, 0.82));
+            setPullDistance(pull);
+          } else {
+            setPullDistance(0);
+          }
+        };
+
+        const handleTouchEnd = () => {
+          if (!isPullingRef.current || isRefreshing) return;
+          isPullingRef.current = false;
+          if (pullDistance >= 46) {
+            handleRefresh();
+          } else {
+            setPullDistance(0);
+          }
+        };
 
         return (
-          <div className={`max-w-md mx-auto min-h-screen ${darkMode ? 'bg-slate-900 text-slate-100' : 'bg-[#eef4f0] text-slate-800'} flex flex-col shadow-2xl relative font-sans pb-20`}>
+          <div 
+            onTouchStart={handleTouchStart}
+            onTouchMove={handleTouchMove}
+            onTouchEnd={handleTouchEnd}
+            className={`max-w-md mx-auto min-h-screen ${darkMode ? 'bg-slate-900 text-slate-100' : 'bg-[#eef4f0] text-slate-800'} flex flex-col shadow-2xl relative font-sans pb-20`}
+          >
+            {/* PULL DOWN REFRESH INDICATOR */}
+            <div 
+              style={{ 
+                height: `${pullDistance}px`, 
+                transition: isPullingRef.current ? 'none' : 'height 0.25s cubic-bezier(0.25, 1, 0.5, 1)',
+                opacity: pullDistance > 6 ? 1 : 0
+              }}
+              className="w-full overflow-hidden flex items-center justify-center bg-emerald-950/15 dark:bg-emerald-400/10 text-emerald-900 dark:text-emerald-200 select-none"
+            >
+              <div className="flex items-center gap-2 text-xs font-extrabold py-2">
+                <span 
+                  className={`inline-block transition-transform duration-200 text-sm ${isRefreshing ? 'animate-spin' : pullDistance >= 46 ? 'rotate-180' : ''}`}
+                >
+                  {isRefreshing ? '🔄' : '↓'}
+                </span>
+                <span>
+                  {isRefreshing ? 'डेटा रीफ्रेश हो रहा है...' : pullDistance >= 46 ? 'छोड़ें और रीफ्रेश करें' : 'नीचे खींचें और रीफ्रेश करें'}
+                </span>
+              </div>
+            </div>
             
             {/* IN-APP TOAST */}
             {toast && (
@@ -1910,7 +2043,7 @@
                       <h3 className="font-extrabold text-[15px] text-[#07382c] dark:text-emerald-300">📞 बनाने वाले से संपर्क</h3>
                       {A.naam && <div className="text-[14px] font-bold mt-1.5">{A.naam}</div>}
                       <div className="flex flex-wrap gap-2 mt-2">
-                        {A.whatsapp && <a href={`https://wa.me/${A.whatsapp}`} target="_blank" rel="noopener noreferrer" className="min-h-[44px] px-4 rounded-full bg-emerald-600 text-white font-bold text-[13px] flex items-center">💬 WhatsApp</a>}
+                        {A.whatsapp && <button type="button" onClick={() => openNativeWhatsApp(A.whatsapp, 'अस्सलाम वालेकुम, मस्जिद कनेक्ट ऐप के संबंध में:')} className="min-h-[44px] px-4 rounded-full bg-emerald-600 active:scale-95 text-white font-bold text-[13px] flex items-center transition">💬 WhatsApp</button>}
                         {A.email && <a href={`mailto:${A.email}`} className="min-h-[44px] px-4 rounded-full bg-slate-100 dark:bg-slate-700 font-bold text-[13px] flex items-center">✉️ Email</a>}
                       </div>
                       <p className="text-[11px] text-slate-500 mt-2">सुझाव, गलती या शिकायत भेजें।</p>
@@ -2111,7 +2244,7 @@
                               
                               {/* Security Notice: Password hidden */}
                               <div className="p-2 bg-amber-50 dark:bg-amber-900/30 border border-amber-200 dark:border-amber-700/60 rounded-xl text-[10.5px] text-amber-900 dark:text-amber-200">
-                                🔒 <b>पासवर्ड सुरक्षा:</b> सुरक्षा कारणों से पासवर्ड स्क्रीन पर नहीं दिखेगा। पासवर्ड पाने के लिए फॉर्म भरें और WhatsApp पर मैसेज करें।
+                                🔒 <b>पासवर्ड सुरक्षा:</b> सुरक्षा कारणों से पासवर्ड स्क्रीन पर नहीं दिखेगा। पासवर्ड पाने के लिए फॉर्म भरें और WhatsApp पर मैसेज करें।।
                               </div>
 
                               <div className="grid grid-cols-1 gap-1.5 pt-0.5">
@@ -2125,14 +2258,14 @@
                                   }} 
                                   className="w-full py-2 bg-[#07382c] hover:bg-[#0c4033] text-white rounded-xl text-[10.5px] font-black flex items-center justify-center gap-1.5 shadow-xs transition"
                                 >
-                                  <span>📋 इस ID को लॉगिन फॉर्म में लगाएं</span>
+                                  <span>📋 Fill Login Form </span>
                                 </button>
                                 <button 
                                   type="button" 
                                   onClick={() => handleSendResetRequest(m)} 
                                   className="w-full py-2.5 bg-[#25D366] hover:bg-[#20ba59] active:scale-95 text-white rounded-xl text-[10.5px] font-bold flex items-center justify-center gap-1.5 shadow-sm transition"
                                 >
-                                  <span>💬 एडमिन को पासवर्ड भेजने का अनुरोध करें (WhatsApp)</span>
+                                  <span>💬 Request Password (WhatsApp)</span>
                                 </button>
                               </div>
                             </div>
