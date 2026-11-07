@@ -74,8 +74,8 @@ const DEF = {
   logo: '',
   accent: '#0c6b4f',
   dark: false,
-  monthlyFee: 99,
-  yearlyFee: 499,
+  monthlyFee: 10,
+  yearlyFee: 99,
   upiId: '8084329613@upi',
   qrPhoto: '',
   serverUpi: '8084329613@upi',
@@ -89,26 +89,154 @@ const DEF = {
   bannedDistricts: []
 };
 
-/* ================= ALL-INDIA STATES & SPELLING ALIASES ================= */
-const ALL_INDIA_STATES = [
-  'Uttar Pradesh', 'Bihar', 'Delhi', 'Madhya Pradesh', 'Maharashtra', 'West Bengal',
-  'Rajasthan', 'Gujarat', 'Karnataka', 'Telangana', 'Tamil Nadu', 'Kerala',
-  'Jharkhand', 'Punjab', 'Haryana', 'Uttarakhand', 'Assam', 'Odisha',
-  'Jammu & Kashmir', 'Andhra Pradesh', 'Chhattisgarh', 'Goa', 'Himachal Pradesh',
-  'Tripura', 'Manipur', 'Meghalaya', 'Nagaland', 'Mizoram', 'Sikkim',
-  'Arunachal Pradesh', 'Chandigarh', 'Puducherry', 'Ladakh'
-];
+/* ================= ALL-INDIA STATES & COMPLETE DISTRICT DICTIONARY (36 STATES & UTs) ================= */
+const INDIA_STATE_DISTRICTS = {
+  'Uttar Pradesh': [
+    'Mau', 'Ballia', 'Azamgarh', 'Ghazipur', 'Varanasi', 'Gorakhpur', 'Jaunpur', 'Deoria',
+    'Basti', 'Sant Kabir Nagar', 'Lucknow', 'Kanpur', 'Prayagraj', 'Meerut', 'Bareilly',
+    'Aligarh', 'Moradabad', 'Saharanpur', 'Muzaffarnagar', 'Rampur', 'Sambhal', 'Bijnor',
+    'Agra', 'Ayodhya', 'Sultanpur', 'Pratapgarh', 'Gonda', 'Bahraich', 'Barabanki', 'Sitapur',
+    'Hardoi', 'Noida', 'Ghaziabad', 'Mathura', 'Firozabad', 'Jhansi', 'Mirzapur', 'Bhadohi',
+    'Kushinagar', 'Maharajganj', 'Siddharthnagar', 'Balrampur', 'Shravasti', 'Unnao', 'Rae Bareli',
+    'Amethi', 'Fatehpur', 'Kaushambi', 'Banda', 'Chitrakoot', 'Hamirpur', 'Mahoba', 'Jalaun',
+    'Lalitpur', 'Etawah', 'Mainpuri', 'Kannauj', 'Farrukhabad', 'Auraiya', 'Etah', 'Kasganj',
+    'Hathras', 'Bulandshahr', 'Hapur', 'Baghpat', 'Shamli', 'Amroha', 'Pilibhit', 'Shahjahanpur',
+    'Badaun', 'Lakhimpur Kheri', 'Sonbhadra', 'Chandauli'
+  ],
+  'Bihar': [
+    'Patna', 'Gaya', 'Muzaffarpur', 'Bhagalpur', 'Darbhanga', 'Madhubani', 'Samastipur', 'Purnia',
+    'Katihar', 'Kishanganj', 'Siwan', 'Gopalganj', 'Motihari', 'Bettiah', 'Arrah', 'Buxar',
+    'Rohtas', 'Nalanda', 'Begusarai', 'Saharsa', 'Supaul', 'Munger', 'Jamui', 'Khagaria',
+    'Madhepura', 'Araria', 'Sitamarhi', 'Sheohar', 'Vaishali', 'Saran', 'Nawada', 'Aurangabad',
+    'Jehanabad', 'Arwal', 'Kaimur', 'Banka', 'Lakhisarai', 'Sheikhpura'
+  ],
+  'Delhi': [
+    'Central Delhi', 'New Delhi', 'North Delhi', 'South Delhi', 'East Delhi', 'West Delhi',
+    'Shahdara', 'North East Delhi', 'North West Delhi', 'South East Delhi', 'South West Delhi'
+  ],
+  'Maharashtra': [
+    'Mumbai', 'Mumbai Suburban', 'Pune', 'Nagpur', 'Thane', 'Nashik', 'Aurangabad', 'Solapur',
+    'Amravati', 'Navi Mumbai', 'Kolhapur', 'Akola', 'Jalgaon', 'Latur', 'Dhule', 'Ahmednagar',
+    'Chandrapur', 'Parbhani', 'Jalna', 'Beed', 'Nanded', 'Satara', 'Raigad', 'Ratnagiri',
+    'Buldhana', 'Yavatmal', 'Palghar', 'Sangli'
+  ],
+  'Madhya Pradesh': [
+    'Bhopal', 'Indore', 'Jabalpur', 'Gwalior', 'Ujjain', 'Sagar', 'Dewas', 'Satna', 'Ratlam',
+    'Rewa', 'Katni', 'Singrauli', 'Burhanpur', 'Khandwa', 'Bhind', 'Chhindwara', 'Guna',
+    'Shivpuri', 'Vidisha', 'Damoh', 'Mandsaur', 'Khargone', 'Neemuch'
+  ],
+  'West Bengal': [
+    'Kolkata', 'Howrah', 'North 24 Parganas', 'South 24 Parganas', 'Hooghly', 'Nadia',
+    'Murshidabad', 'Malda', 'Burdwan', 'Asansol', 'Durgapur', 'Siliguri', 'Darjeeling',
+    'Jalpaiguri', 'Birbhum', 'Bankura', 'Purulia', 'Midnapore'
+  ],
+  'Rajasthan': [
+    'Jaipur', 'Jodhpur', 'Kota', 'Bikaner', 'Ajmer', 'Udaipur', 'Bhilwara', 'Alwar',
+    'Bharatpur', 'Sikar', 'Pali', 'Sri Ganganagar', 'Hanumangarh', 'Jhunjhunu', 'Baran',
+    'Chittorgarh', 'Tonk', 'Sawai Madhopur', 'Nagaur', 'Churu', 'Barmer', 'Jaisalmer'
+  ],
+  'Gujarat': [
+    'Ahmedabad', 'Surat', 'Vadodara', 'Rajkot', 'Bhavnagar', 'Jamnagar', 'Junagadh',
+    'Gandhinagar', 'Anand', 'Bharuch', 'Navsari', 'Valsad', 'Kutch', 'Mehsana', 'Patan',
+    'Morbi', 'Amreli', 'Porbandar'
+  ],
+  'Telangana': [
+    'Hyderabad', 'Warangal', 'Nizamabad', 'Karimnagar', 'Khammam', 'Ramagundam',
+    'Mahbubnagar', 'Nalgonda', 'Adilabad', 'Suryapet', 'Siddipet', 'Jagtial'
+  ],
+  'Karnataka': [
+    'Bengaluru', 'Mysuru', 'Hubballi', 'Belagavi', 'Mangaluru', 'Kalaburagi', 'Davanagere',
+    'Ballari', 'Vijayapura', 'Shivamogga', 'Tumakuru', 'Raichur', 'Bidar', 'Udupi'
+  ],
+  'Tamil Nadu': [
+    'Chennai', 'Coimbatore', 'Madurai', 'Tiruchirappalli', 'Salem', 'Tirunelveli', 'Tiruppur',
+    'Vellore', 'Erode', 'Thoothukudi', 'Dindigul', 'Thanjavur', 'Kanchipuram'
+  ],
+  'Kerala': [
+    'Thiruvananthapuram', 'Kochi', 'Kozhikode', 'Malappuram', 'Kollam', 'Thrissur', 'Kannur',
+    'Palakkad', 'Kasaragod', 'Alappuzha', 'Kottayam', 'Wayanad'
+  ],
+  'Jharkhand': [
+    'Ranchi', 'Jamshedpur', 'Dhanbad', 'Bokaro', 'Deoghar', 'Hazaribagh', 'Giridih', 'Ramgarh',
+    'Palamu', 'Dumka', 'Godda', 'Sahibganj', 'Pakur', 'Koderma', 'Chatra', 'Garhwa'
+  ],
+  'Punjab': [
+    'Ludhiana', 'Amritsar', 'Jalandhar', 'Patiala', 'Bathinda', 'Mohali', 'Hoshiarpur',
+    'Pathankot', 'Moga', 'Batala', 'Malerkotla', 'Firozpur', 'Sangrur', 'Gurdaspur'
+  ],
+  'Haryana': [
+    'Gurugram', 'Faridabad', 'Panipat', 'Ambala', 'Yamunanagar', 'Rohtak', 'Hisar', 'Karnal',
+    'Sonipat', 'Panchkula', 'Sirsa', 'Bhiwani', 'Rewari'
+  ],
+  'Uttarakhand': [
+    'Dehradun', 'Haridwar', 'Roorkee', 'Haldwani', 'Nainital', 'Rudrapur', 'Rishikesh',
+    'Almora', 'Pithoragarh', 'Chamoli', 'Udham Singh Nagar'
+  ],
+  'Assam': [
+    'Guwahati', 'Kamrup', 'Dibrugarh', 'Silchar', 'Nagaon', 'Barpeta', 'Dhubri', 'Cachar',
+    'Karimganj', 'Jorhat', 'Tinsukia', 'Bongaigaon'
+  ],
+  'Odisha': [
+    'Bhubaneswar', 'Cuttack', 'Rourkela', 'Berhampur', 'Sambalpur', 'Puri', 'Balasore', 'Bhadrak', 'Angul', 'Jharsuguda'
+  ],
+  'Jammu & Kashmir': [
+    'Srinagar', 'Jammu', 'Anantnag', 'Baramulla', 'Budgam', 'Pulwama', 'Kupwara', 'Kulgam',
+    'Kathua', 'Udhampur', 'Rajouri', 'Poonch', 'Doda'
+  ],
+  'Andhra Pradesh': [
+    'Visakhapatnam', 'Vijayawada', 'Guntur', 'Nellore', 'Kurnool', 'Rajahmundry', 'Tirupati', 'Kadapa', 'Kakinada', 'Anantapur'
+  ],
+  'Chhattisgarh': [
+    'Raipur', 'Bhilai', 'Bilaspur', 'Korba', 'Durg', 'Rajnandgaon', 'Jagdalpur', 'Raigarh', 'Ambikapur'
+  ],
+  'Goa': [
+    'North Goa', 'South Goa', 'Panaji', 'Margao'
+  ],
+  'Himachal Pradesh': [
+    'Shimla', 'Kangra', 'Mandi', 'Solan', 'Kullu', 'Chamba', 'Hamirpur', 'Una'
+  ],
+  'Tripura': [
+    'Agartala', 'Gomati', 'North Tripura', 'South Tripura', 'Dhalai', 'Unakoti'
+  ],
+  'Manipur': [
+    'Imphal', 'Thoubal', 'Churachandpur', 'Bishnupur'
+  ],
+  'Meghalaya': [
+    'Shillong', 'West Garo Hills', 'Jaintia Hills', 'Ri-Bhoi'
+  ],
+  'Nagaland': [
+    'Kohima', 'Dimapur', 'Mokokchung'
+  ],
+  'Mizoram': [
+    'Aizawl', 'Lunglei', 'Champhai'
+  ],
+  'Sikkim': [
+    'Gangtok', 'Namchi', 'Mangan', 'Geyzing'
+  ],
+  'Arunachal Pradesh': [
+    'Itanagar', 'Tawang', 'Pasighat'
+  ],
+  'Chandigarh': [
+    'Chandigarh'
+  ],
+  'Puducherry': [
+    'Puducherry', 'Karaikal', 'Mahe', 'Yanam'
+  ],
+  'Ladakh': [
+    'Leh', 'Kargil'
+  ],
+  'Andaman & Nicobar Islands': [
+    'Port Blair', 'South Andaman'
+  ],
+  'Dadra & Nagar Haveli and Daman & Diu': [
+    'Daman', 'Diu', 'Silvassa'
+  ],
+  'Lakshadweep': [
+    'Kavaratti'
+  ]
+};
 
-const POPULAR_DISTRICTS = [
-  'Mau', 'Ballia', 'Azamgarh', 'Ghazipur', 'Varanasi', 'Gorakhpur', 'Jaunpur', 'Deoria',
-  'Basti', 'Sant Kabir Nagar', 'Lucknow', 'Kanpur', 'Prayagraj', 'Meerut', 'Bareilly',
-  'Aligarh', 'Moradabad', 'Saharanpur', 'Muzaffarnagar', 'Rampur', 'Sambhal', 'Bijnor',
-  'Agra', 'Faizabad', 'Ayodhya', 'Sultanpur', 'Pratapgarh', 'Gonda', 'Bahraich',
-  'Barabanki', 'Sitapur', 'Hardoi', 'Noida', 'Ghaziabad', 'Patna', 'Gaya',
-  'Muzaffarpur', 'Bhagalpur', 'Darbhanga', 'Madhubani', 'Samastipur', 'Purnia', 'Katihar',
-  'Kishanganj', 'Siwan', 'Gopalganj', 'Motihari', 'Bettiah', 'Bhopal', 'Indore',
-  'Jaipur', 'Mumbai', 'Kolkata', 'Hyderabad', 'Bengaluru'
-];
+const ALL_INDIA_STATES = Object.keys(INDIA_STATE_DISTRICTS).sort();
 
 const STATE_ALIASES = {
   'up': 'Uttar Pradesh', 'u.p.': 'Uttar Pradesh', 'u p': 'Uttar Pradesh',
@@ -152,7 +280,6 @@ const normalizeState = (rawState) => {
   return rawState.trim();
 };
 
-// Smart matching: Handles UP, U.P., Uttar Pardesh, address mentions
 const isMosqueInState = (m, targetState) => {
   if (!targetState || targetState === 'all') return true;
   const normTarget = normalizeState(targetState);
@@ -172,7 +299,6 @@ const isMosqueInState = (m, targetState) => {
   return false;
 };
 
-// Smart matching for district/city: Handles Mau, Ballia, Azamgarh, etc.
 const isMosqueInDistrict = (m, targetDistrict) => {
   if (!targetDistrict || targetDistrict === 'all') return true;
   const tKey = stripPunct(targetDistrict);
@@ -188,7 +314,7 @@ const pad = n => String(n).padStart(2, '0');
 const iso = d => `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
 const today = () => iso(new Date());
 const addMonths = (s, n) => {
-  const d = new Date(s + 'T00:00:00');
+  const d = new Date((s || today()) + 'T00:00:00');
   const day = d.getDate();
   d.setMonth(d.getMonth() + n);
   if (d.getDate() < day) d.setDate(0);
@@ -293,10 +419,12 @@ function AdminApp() {
   const [logs, setLogs] = useState([]);
   const [reqs, setReqs] = useState([]);
   const [anns, setAnns] = useState([]);
+  const [passwordResets, setPasswordResets] = useState([]);
+  const [feedbacks, setFeedbacks] = useState([]);
   const [live, setLive] = useState({});
   const [online, setOnline] = useState(false);
-  const [page, setPage] = useState('dashboard'); // 'dashboard' | 'masjids' | 'regions' | 'plans' | 'broadcast' | 'settings'
-  const [drawer, setDrawer] = useState(false);
+  const [page, setPage] = useState('dashboard'); // 'dashboard' | 'masjids' | 'regions' | 'resets' | 'feedback' | 'plans' | 'broadcast' | 'settings'
+  const [drawer, setDrawer] = useState(false); // Sidebar only closes when 3-lines menu clicked again
   const [dark, setDark] = useState(() => localStorage.getItem('mca_dark') ? localStorage.getItem('mca_dark') === '1' : false);
   const [toast, setToast] = useState(null);
 
@@ -313,19 +441,25 @@ function AdminApp() {
   const [fDistrict, setFDistrict] = useState('all');
   const [fStat, setFStat] = useState('all');
 
-  // Pre-ban inputs in Regions tab
-  const [customBanType, setCustomBanType] = useState('district'); // 'district' | 'state'
+  // All-India Ban Selector State
+  const [selBanState, setSelBanState] = useState('Uttar Pradesh');
+  const [selBanDistrict, setSelBanDistrict] = useState('');
   const [customBanInput, setCustomBanInput] = useState('');
   const [regionFilter, setRegionFilter] = useState('');
+  const [showAllStatesView, setShowAllStatesView] = useState(true);
 
   // Drafts & inputs
   const [draft, setDraft] = useState(S);
   const [nt, setNt] = useState('');
   const [nb, setNb] = useState('');
   const [bulkPricingModal, setBulkPricingModal] = useState(false);
-  const [bulkSeasonalFee, setBulkSeasonalFee] = useState(299);
-  const [bulkSeasonalNote, setBulkSeasonalNote] = useState('Ramadan Mubarak Special: Annual Access ₹299');
+  const [bulkSeasonalFee, setBulkSeasonalFee] = useState(99);
+  const [bulkSeasonalNote, setBulkSeasonalNote] = useState('Special Annual Access @ ₹99');
   const swept = useRef({});
+
+  // Dynamic plan calculation in Plan Modal
+  const [calcAmt, setCalcAmt] = useState(30);
+  const [calcRate, setCalcRate] = useState(10);
 
   const say = (m, t = 'ok') => {
     setToast({ m, t });
@@ -386,6 +520,16 @@ function AdminApp() {
       setReqs(sn.docs.map(d => ({ id: d.id, ...d.data() })).filter(r => !r.status || r.status === 'pending'));
     }));
 
+    // 6. Password Reset Requests
+    off.push(db.collection('password_resets').orderBy('ts', 'desc').limit(100).onSnapshot(sn => {
+      setPasswordResets(sn.docs.map(d => ({ id: d.id, ...d.data() })));
+    }, () => {}));
+
+    // 7. Complaints and Feedback
+    off.push(db.collection('feedback_and_complaints').orderBy('ts', 'desc').limit(200).onSnapshot(sn => {
+      setFeedbacks(sn.docs.map(d => ({ id: d.id, ...d.data() })));
+    }, () => {}));
+
     return () => off.forEach(f => f && f());
   }, [user]);
 
@@ -396,7 +540,7 @@ function AdminApp() {
     if (!mq) return;
     const onC = () => {
       setOnline(true);
-      mq.subscribe([`${TOPIC}/live_broadcast`, `${TOPIC}/events`]);
+      mq.subscribe([`${TOPIC}/live_broadcast`, `${TOPIC}/events`, `${TOPIC}/db/feedback`, `${TOPIC}/db/resets`]);
     };
     const onM = (t, msg) => {
       try {
@@ -437,11 +581,9 @@ function AdminApp() {
     const updated = { ...prev, ...data, id, updatedAt: Date.now() };
     setMasjids(p => ({ ...p, [id]: updated }));
 
-    // 1. Firestore Cloud DB
     if (db) {
       try { await db.collection('masjids').doc(id).set(updated, { merge: true }); } catch (e) { console.warn(e); }
     }
-    // 2. Realtime MQTT retained sync
     try {
       if (mq && mq.connected) {
         mq.publish(`${TOPIC}/db/${id}`, JSON.stringify(updated), { retain: true, qos: 1 });
@@ -459,7 +601,6 @@ function AdminApp() {
 
     setMasjids(prev => ({ ...prev, ...updatedMap }));
 
-    // 1. Batch write to Firestore in chunks of 400
     if (db) {
       for (let i = 0; i < list.length; i += 400) {
         const batch = db.batch();
@@ -470,7 +611,6 @@ function AdminApp() {
       }
     }
 
-    // 2. Broadcast updates to MQTT
     try {
       if (mq && mq.connected) {
         Object.values(updatedMap).forEach(u => {
@@ -494,6 +634,50 @@ function AdminApp() {
     });
   };
 
+  // Delete / Void payment log to directly decrease total revenue
+  const deletePaymentLog = async (logId, amount, masjidName) => {
+    if (!db) return;
+    try {
+      await db.collection('payment_log').doc(logId).delete();
+      say(`₹${amount} log voided for ${masjidName}. Total revenue decreased!`);
+    } catch (e) {
+      say('Error deleting log: ' + e.message, 'err');
+    }
+  };
+
+  // Delete complaint / feedback permanently
+  const deleteFeedback = async (id) => {
+    if (!db) return;
+    try {
+      await db.collection('feedback_and_complaints').doc(id).delete();
+      setFeedbacks(prev => prev.filter(x => x.id !== id));
+      say('शिकायत / सुझाव स्थायी रूप से मिटा दिया गया!');
+    } catch (e) {
+      say('Error: ' + e.message, 'err');
+    }
+  };
+
+  // Mark feedback as resolved
+  const toggleFeedbackResolved = async (id, curStatus) => {
+    if (!db) return;
+    const newStatus = curStatus === 'resolved' ? 'pending' : 'resolved';
+    await db.collection('feedback_and_complaints').doc(id).set({ status: newStatus, resolvedAt: Date.now() }, { merge: true });
+    setFeedbacks(prev => prev.map(f => f.id === id ? { ...f, status: newStatus } : f));
+    say(newStatus === 'resolved' ? 'सफलतापूर्वक हल (Resolved) मार्क किया गया!' : 'मार्क लंबित (Pending)');
+  };
+
+  // Delete or Complete Password Reset Request
+  const deletePasswordReset = async (id) => {
+    if (!db) return;
+    try {
+      await db.collection('password_resets').doc(id).delete();
+      setPasswordResets(prev => prev.filter(x => x.id !== id));
+      say('पासवर्ड रीसेट अनुरोध समाप्त किया गया');
+    } catch (e) {
+      say('Error: ' + e.message, 'err');
+    }
+  };
+
   /* auto-expire: paid plan date nikalte hi access auto-lock */
   useEffect(() => {
     if (!loaded || !db) return;
@@ -504,40 +688,40 @@ function AdminApp() {
       .then(() => say(`${exp.length} plan expired — access locked automatically`));
   }, [loaded, masjids]);
 
-  /* Plan Activation with Independent Granular Controls */
-  const activate = async (m, plan, status, customOverrides = {}) => {
-    const months = plan === 'monthly' ? 1 : 12;
-    const amount = plan === 'monthly' ? S.monthlyFee : S.yearlyFee;
+  /* Plan Activation with Automatic Multi-Month Calculation */
+  const activateWithAmount = async (m, amountPaid, monthlyRate = 10, note = 'Admin manual activation') => {
+    const amt = Number(amountPaid) || 0;
+    const rate = Number(monthlyRate) || Number(S.monthlyFee) || 10;
+    const calculatedMonths = Math.max(1, Math.floor(amt / rate));
     const base = (m.paymentExpiry && m.paymentExpiry >= today() && eff(m) === 'paid') ? m.paymentExpiry : today();
-    const expiry = addMonths(base, months);
+    const expiry = addMonths(base, calculatedMonths);
 
-    // Keep liveAzan, timeEdit, isVerified respectful of manual admin overrides
     const updateData = {
-      paymentPlan: plan,
+      paymentPlan: calculatedMonths >= 12 ? 'yearly' : 'monthly',
       paymentStatus: 'paid',
       paymentExpiry: expiry,
-      paymentAmount: amount,
+      paymentAmount: amt,
       paymentStart: today(),
-      liveAzanAllowed: customOverrides.liveAzanAllowed !== undefined ? customOverrides.liveAzanAllowed : (m.liveAzanAllowed !== false),
-      timeEditAllowed: customOverrides.timeEditAllowed !== undefined ? customOverrides.timeEditAllowed : (m.timeEditAllowed !== false),
-      isVerified: customOverrides.isVerified !== undefined ? customOverrides.isVerified : !!m.isVerified,
+      liveAzanAllowed: m.liveAzanAllowed !== false,
+      timeEditAllowed: m.timeEditAllowed !== false,
+      isVerified: !!m.isVerified,
       pendingUtr: null,
-      ...customOverrides
+      paymentNotes: note
     };
 
     await patch(m.id, updateData);
-    await logPay(m, plan, amount, status || 'Admin activated');
-    say(`${m.name}: ${plan === 'monthly' ? '1 Month' : '1 Year'} activated till ${expiry}`);
+    if (amt > 0) {
+      await logPay(m, updateData.paymentPlan, amt, `${calculatedMonths} Months @ ₹${rate}/mo - ${note}`);
+    }
+    say(`${m.name}: ₹${amt} के आधार पर ${calculatedMonths} महीने सक्रिय (वैध: ${expiry})`);
   };
 
   const approveReq = async (r, plan) => {
     const m = masjids[r.masjidId];
     if (!m) return say('Masjid not found', 'err');
-    // Activates paid plan while preserving independent switches
-    await activate(m, plan, 'Approved UTR: ' + (r.utr || ''), {
-      liveAzanAllowed: true,
-      timeEditAllowed: true
-    });
+    const amt = Number(r.amount) || (plan === 'yearly' ? S.yearlyFee : S.monthlyFee) || 10;
+    const rate = Number(S.monthlyFee) || 10;
+    await activateWithAmount(m, amt, rate, 'Approved UTR: ' + (r.utr || ''));
     await db.collection('payment_requests').doc(r.id).set({ status: 'approved', approvedAt: Date.now(), plan }, { merge: true });
   };
 
@@ -546,7 +730,7 @@ function AdminApp() {
     say('Request rejected');
   };
 
-  // 1-Click Granular Toggles (Completely Independent from Payment Status)
+  // 1-Click Granular Toggles (Independent from Payment Status)
   const toggle = (m, k, label) => {
     const v = !(m[k] !== false);
     patch(m.id, { [k]: v });
@@ -609,7 +793,7 @@ function AdminApp() {
     say('Announcement sent');
   };
 
-  /* ================= 1-CLICK STATE & DISTRICT BAN & PRE-BAN SYSTEM ================= */
+  /* ================= 1-CLICK STATE & DISTRICT BAN (ALL INDIA) ================= */
   const handleBanState = (rawStateName) => {
     const normState = normalizeState(rawStateName) || rawStateName.trim();
     const affected = all.filter(m => isMosqueInState(m, normState));
@@ -617,12 +801,14 @@ function AdminApp() {
       t: `🚫 Ban Entire State: "${normState}"?`,
       d: `This will suspend all ${affected.length} registered mosques in ${normState} and pre-ban any future registrations. All users & imams in ${normState} will be blocked from accessing the app.`,
       go: async () => {
-        await batchPatch(affected, () => ({
-          isSuspended: true,
-          liveAzanAllowed: false,
-          timeEditAllowed: false,
-          banReason: `State-wide suspension: ${normState}`
-        }));
+        if (affected.length > 0) {
+          await batchPatch(affected, () => ({
+            isSuspended: true,
+            liveAzanAllowed: false,
+            timeEditAllowed: false,
+            banReason: `State-wide suspension: ${normState}`
+          }));
+        }
         const updatedBanned = [...new Set([...(S.bannedStates || []), normState])];
         const newS = { ...S, bannedStates: updatedBanned };
         setS(newS);
@@ -643,14 +829,16 @@ function AdminApp() {
     const affected = all.filter(m => isMosqueInState(m, normState));
     setConfirm({
       t: `✅ Restore State: "${normState}"?`,
-      d: `All ${affected.length} mosques in ${normState} will be restored to active status with Live Azan and Time Editing allowed.`,
+      d: `All mosques in ${normState} will be restored to active status with Live Azan and Time Editing allowed.`,
       go: async () => {
-        await batchPatch(affected, () => ({
-          isSuspended: false,
-          liveAzanAllowed: true,
-          timeEditAllowed: true,
-          banReason: null
-        }));
+        if (affected.length > 0) {
+          await batchPatch(affected, () => ({
+            isSuspended: false,
+            liveAzanAllowed: true,
+            timeEditAllowed: true,
+            banReason: null
+          }));
+        }
         const updatedBanned = (S.bannedStates || []).filter(s => stripPunct(s) !== stripPunct(normState));
         const newS = { ...S, bannedStates: updatedBanned };
         setS(newS);
@@ -670,15 +858,17 @@ function AdminApp() {
     const cleanDist = rawDistrictName.trim();
     const affected = all.filter(m => isMosqueInDistrict(m, cleanDist));
     setConfirm({
-      t: `🚫 Ban Entire District: "${cleanDist}"?`,
+      t: `🚫 Ban District: "${cleanDist}"?`,
       d: `This will suspend all ${affected.length} mosques in district ${cleanDist} ${rawStateName ? '(' + rawStateName + ')' : ''} and pre-ban that district so users cannot use the app there.`,
       go: async () => {
-        await batchPatch(affected, () => ({
-          isSuspended: true,
-          liveAzanAllowed: false,
-          timeEditAllowed: false,
-          banReason: `District-wide suspension: ${cleanDist}`
-        }));
+        if (affected.length > 0) {
+          await batchPatch(affected, () => ({
+            isSuspended: true,
+            liveAzanAllowed: false,
+            timeEditAllowed: false,
+            banReason: `District-wide suspension: ${cleanDist}`
+          }));
+        }
         const updatedBanned = [...new Set([...(S.bannedDistricts || []), cleanDist])];
         const newS = { ...S, bannedDistricts: updatedBanned };
         setS(newS);
@@ -699,14 +889,16 @@ function AdminApp() {
     const affected = all.filter(m => isMosqueInDistrict(m, cleanDist));
     setConfirm({
       t: `✅ Restore District: "${cleanDist}"?`,
-      d: `All ${affected.length} mosques in district ${cleanDist} will be restored.`,
+      d: `All mosques in district ${cleanDist} will be restored.`,
       go: async () => {
-        await batchPatch(affected, () => ({
-          isSuspended: false,
-          liveAzanAllowed: true,
-          timeEditAllowed: true,
-          banReason: null
-        }));
+        if (affected.length > 0) {
+          await batchPatch(affected, () => ({
+            isSuspended: false,
+            liveAzanAllowed: true,
+            timeEditAllowed: true,
+            banReason: null
+          }));
+        }
         const updatedBanned = (S.bannedDistricts || []).filter(d => stripPunct(d) !== stripPunct(cleanDist));
         const newS = { ...S, bannedDistricts: updatedBanned };
         setS(newS);
@@ -720,19 +912,6 @@ function AdminApp() {
         say(`District "${cleanDist}" UNBANNED (${affected.length} mosques active)`);
       }
     });
-  };
-
-  // Pre-ban any custom write-in or selected district/state
-  const handleAddCustomPreBan = (e) => {
-    e.preventDefault();
-    const val = customBanInput.trim();
-    if (!val) return;
-    if (customBanType === 'state') {
-      handleBanState(val);
-    } else {
-      handleBanDistrict(val);
-    }
-    setCustomBanInput('');
   };
 
   /* ================= LOGIN HANDLERS ================= */
@@ -753,7 +932,6 @@ function AdminApp() {
     const isMobile = cleanDigits.length === 10;
     const emailToUse = isMobile ? `admin_${cleanDigits}@masjidconnect.admin` : raw;
 
-    // 1. Direct Master Passcode / Key check
     const masterCodes = ['786', 'admin786', S.adminPasscode || '786'];
     if (masterCodes.includes(pass) || masterCodes.includes(raw)) {
       const adminSession = {
@@ -769,7 +947,6 @@ function AdminApp() {
       return;
     }
 
-    // 2. Firebase Authentication
     if (auth) {
       try {
         const cred = await auth.signInWithEmailAndPassword(emailToUse, pass);
@@ -789,7 +966,6 @@ function AdminApp() {
             return;
           } catch (createErr) {}
         }
-
         let msg = er.message;
         if (er.code === 'auth/wrong-password' || er.code === 'auth/invalid-credential') {
           msg = 'Galat password ya credentials! (Master Passcode "786" bhi use kar sakte hain)';
@@ -897,7 +1073,6 @@ function AdminApp() {
   /* ================= DERIVED COMPUTATIONS & SMART FILTERS ================= */
   const all = useMemo(() => Object.values(masjids), [masjids]);
 
-  // Unique normalized states from DB
   const statesInDb = useMemo(() => {
     const set = new Set();
     all.forEach(m => {
@@ -907,7 +1082,6 @@ function AdminApp() {
     return [...set].sort();
   }, [all]);
 
-  // Unique districts from DB (optionally filtered by selected state)
   const districtsInDb = useMemo(() => {
     const set = new Set();
     all.forEach(m => {
@@ -919,22 +1093,16 @@ function AdminApp() {
     return [...set].sort();
   }, [all, fState]);
 
-  // Filtered mosques list based on all filters
   const list = useMemo(() => {
     const k = q.trim().toLowerCase();
     return all.filter(m => {
-      // 1. Text Search Keyword
       if (k && ![
         m.name, m.id, m.stateLocation, m.stateName, m.address, m.imamName, m.phone, m.passcode
       ].some(x => String(x || '').toLowerCase().includes(k))) return false;
 
-      // 2. Smart State Match (handles UP, uttar pardesh, etc.)
       if (fState !== 'all' && !isMosqueInState(m, fState)) return false;
-
-      // 3. Smart District Match (handles Mau, Ballia, etc.)
       if (fDistrict !== 'all' && !isMosqueInDistrict(m, fDistrict)) return false;
 
-      // 4. Status Filter
       const s = eff(m);
       if (fStat === 'paid' || fStat === 'free' || fStat === 'expired' || fStat === 'pending') return s === fStat;
       if (fStat === 'suspended') return !!m.isSuspended;
@@ -947,9 +1115,15 @@ function AdminApp() {
     }).sort((a, b) => (b.updatedAt || 0) - (a.updatedAt || 0));
   }, [all, q, fState, fDistrict, fStat, live]);
 
+  // Dynamic Revenue: Active Subscriptions sum + Audit Log sum
   const st = useMemo(() => {
     const c = x => all.filter(x).length;
     const mo = today().slice(0, 7);
+    // Active Paid Revenue drops immediately if a mosque is marked free, expired, or locked
+    const activePaidRev = all.filter(m => eff(m) === 'paid').reduce((s, m) => s + (Number(m.paymentAmount) || 0), 0);
+    const logRevAll = logs.reduce((s, l) => s + (Number(l.amount) || 0), 0);
+    const logRevMo = logs.filter(l => (l.date || '').startsWith(mo)).reduce((s, l) => s + (Number(l.amount) || 0), 0);
+
     return {
       total: all.length,
       active: c(m => !m.isSuspended),
@@ -961,8 +1135,11 @@ function AdminApp() {
       nogps: c(m => !hasGps(m)),
       live: Object.keys(live).length,
       fol: all.reduce((s, m) => s + (m.followersCount || 0), 0),
-      revAll: logs.reduce((s, l) => s + (l.amount || 0), 0),
-      revMo: logs.filter(l => (l.date || '').startsWith(mo)).reduce((s, l) => s + (l.amount || 0), 0),
+      activePaidRev,
+      revAll: logRevAll,
+      revMo: logRevMo,
+      pendingResets: passwordResets.filter(r => r.status !== 'completed').length,
+      pendingFeedbacks: feedbacks.filter(f => f.status !== 'resolved').length,
       soon: all.filter(m => eff(m) === 'paid' && daysLeft(m.paymentExpiry) !== null && daysLeft(m.paymentExpiry) <= 7).sort((a, b) => a.paymentExpiry.localeCompare(b.paymentExpiry)),
       byState: Object.entries(all.reduce((o, m) => {
         const k = normalizeState(m.stateName) || 'Unknown';
@@ -970,58 +1147,37 @@ function AdminApp() {
         return o;
       }, {})).sort((a, b) => b[1] - a[1]).slice(0, 8)
     };
-  }, [all, logs, live]);
+  }, [all, logs, live, passwordResets, feedbacks]);
 
-  // Grouped regions for 1-Click State & District Ban page
-  const regionData = useMemo(() => {
-    const stateMap = {};
-    const districtMap = {};
-
-    all.forEach(m => {
-      const s = normalizeState(m.stateName) || 'Unknown';
-      const d = (m.stateLocation || 'Unknown').trim() || 'Unknown';
-
-      // State Map
-      if (!stateMap[s]) stateMap[s] = { name: s, total: 0, active: 0, suspended: 0, districts: new Set() };
-      stateMap[s].total++;
-      if (m.isSuspended) stateMap[s].suspended++;
-      else stateMap[s].active++;
-      stateMap[s].districts.add(d);
-
-      // District Map
-      const dk = `${d}__${s}`;
-      if (!districtMap[dk]) districtMap[dk] = { name: d, stateName: s, total: 0, active: 0, suspended: 0 };
-      districtMap[dk].total++;
-      if (m.isSuspended) districtMap[dk].suspended++;
-      else districtMap[dk].active++;
+  // All 36 States with registered + un-registered stats
+  const allIndiaStatesData = useMemo(() => {
+    return ALL_INDIA_STATES.map(stateName => {
+      const mosquesInState = all.filter(m => isMosqueInState(m, stateName));
+      const total = mosquesInState.length;
+      const suspended = mosquesInState.filter(m => m.isSuspended).length;
+      const active = total - suspended;
+      const isConfigBanned = (S.bannedStates || []).some(b => stripPunct(b) === stripPunct(stateName));
+      return {
+        name: stateName,
+        total,
+        active,
+        suspended,
+        districtsCount: (INDIA_STATE_DISTRICTS[stateName] || []).length,
+        isFullyBanned: isConfigBanned || (total > 0 && suspended === total),
+        isPartiallyBanned: !isConfigBanned && suspended > 0 && suspended < total
+      };
+    }).sort((a, b) => {
+      if (a.total !== b.total) return b.total - a.total;
+      return a.name.localeCompare(b.name);
     });
-
-    const statesList = Object.values(stateMap).map(st => {
-      const isConfigBanned = (S.bannedStates || []).some(b => stripPunct(b) === stripPunct(st.name));
-      return {
-        ...st,
-        districtsCount: st.districts.size,
-        isFullyBanned: isConfigBanned || (st.total > 0 && st.suspended === st.total),
-        isPartiallyBanned: !isConfigBanned && st.suspended > 0 && st.suspended < st.total
-      };
-    }).sort((a, b) => b.total - a.total);
-
-    const districtsList = Object.values(districtMap).map(dt => {
-      const isConfigBanned = (S.bannedDistricts || []).some(b => stripPunct(b) === stripPunct(dt.name));
-      return {
-        ...dt,
-        isFullyBanned: isConfigBanned || (dt.total > 0 && dt.suspended === dt.total),
-        isPartiallyBanned: !isConfigBanned && dt.suspended > 0 && dt.suspended < dt.total
-      };
-    }).sort((a, b) => b.total - a.total);
-
-    return { statesList, districtsList };
-  }, [all, S.bannedStates, S.bannedDistricts]);
+  }, [all, S.bannedStates]);
 
   const NAV = [
     ['dashboard', '📊', 'Dashboard'],
     ['masjids', '🕌', 'Mosques'],
     ['regions', '🗺️', 'State & District Ban'],
+    ['resets', '🔑', 'Password Resets'],
+    ['feedback', '💬', 'शिकायत व सुझाव'],
     ['plans', '💳', 'Plans & Payments'],
     ['broadcast', '📢', 'Broadcast'],
     ['settings', '⚙️', 'Settings']
@@ -1047,7 +1203,6 @@ function AdminApp() {
             <p className="text-xs text-slate-500 dark:text-slate-400 font-semibold">{S.tagline}</p>
           </div>
 
-          {/* Mode Switcher Tabs */}
           <div className="grid grid-cols-2 p-1 bg-slate-100 dark:bg-slate-700/60 rounded-xl text-xs font-bold">
             <button
               type="button"
@@ -1065,7 +1220,6 @@ function AdminApp() {
             </button>
           </div>
 
-          {/* Mode 1: Email or Mobile Number Login */}
           {loginMode === 'credentials' && (
             <form onSubmit={handleCredentialLogin} className="space-y-3.5">
               <div>
@@ -1108,7 +1262,6 @@ function AdminApp() {
             </form>
           )}
 
-          {/* Mode 2: Quick Master Passcode Login */}
           {loginMode === 'passcode' && (
             <form onSubmit={handlePasscodeLogin} className="space-y-3.5">
               <div>
@@ -1154,59 +1307,43 @@ function AdminApp() {
         </div>
       )}
 
-      {/* Top Header */}
-      <header className="sticky top-0 z-50 text-white shadow-md" style={{ background: `linear-gradient(90deg, ${S.accent}, #063b2c)` }}>
-        <div className="flex items-center gap-3 px-3 sm:px-5 h-16 max-w-7xl mx-auto">
-          <button onClick={() => setDrawer(true)} aria-label="Menu" className="w-10 h-10 rounded-xl bg-white/15 hover:bg-white/25 flex flex-col items-center justify-center gap-[5px] transition">
-            <i className="block w-5 h-0.5 bg-white rounded" />
-            <i className="block w-5 h-0.5 bg-white rounded" />
-            <i className="block w-5 h-0.5 bg-white rounded" />
+      {/* Slide-out Left Drawer: ONLY closes when 3-lines menu clicked again. NO backdrop that closes on outside click! */}
+      <aside className={`fixed top-0 left-0 bottom-0 z-[100] w-72 bg-white dark:bg-slate-800 shadow-2xl transition-transform duration-300 flex flex-col border-r dark:border-slate-700 ${drawer ? 'translate-x-0' : '-translate-x-full'}`}>
+        <div className="p-4 text-white flex items-center justify-between gap-3" style={{ background: S.accent }}>
+          <div className="flex items-center gap-3 min-w-0">
+            <Logo s={40} />
+            <div className="min-w-0">
+              <div className="fm text-base truncate font-bold">{S.brand}</div>
+              <div className="text-[11px] text-white/80 truncate font-mono">{user.email || 'Super Admin'}</div>
+            </div>
+          </div>
+          <button onClick={() => setDrawer(false)} className="w-8 h-8 rounded-lg bg-white/20 hover:bg-white/30 flex items-center justify-center text-xs font-bold transition">
+            ✕
           </button>
-          <Logo s={38} />
-          <div className="min-w-0">
-            <div className="fm text-lg leading-tight truncate font-bold">{S.brand}</div>
-            <div className="text-[11px] text-white/70 truncate">{S.tagline}</div>
-          </div>
-          <div className="ml-auto flex items-center gap-2">
-            <span className="hidden sm:flex items-center gap-1.5 text-[11px] px-2.5 py-1 rounded-full bg-white/10 font-bold">
-              <i className={`w-2 h-2 rounded-full ${loaded ? 'bg-emerald-300' : 'bg-amber-300'}`} />
-              {loaded ? 'Firestore Live' : 'Connecting…'}
-            </span>
-            <span className="hidden md:flex items-center gap-1.5 text-[11px] px-2.5 py-1 rounded-full bg-white/10 font-bold">
-              <i className={`w-2 h-2 rounded-full ${Object.keys(live).length ? 'bg-rose-400 animate-pulse' : 'bg-white/40'}`} />
-              {Object.keys(live).length} Live Azan
-            </span>
-            <button onClick={() => setDark(!dark)} className="w-10 h-10 rounded-xl bg-white/15 hover:bg-white/25 flex items-center justify-center text-sm transition" title="Toggle Theme">
-              {dark ? '☀️' : '🌙'}
-            </button>
-            <button onClick={handleLogout} className="px-3 h-10 rounded-xl bg-rose-600/80 hover:bg-rose-600 text-xs font-bold transition">
-              Logout
-            </button>
-          </div>
-        </div>
-      </header>
-
-      {/* Slide-out Left Drawer */}
-      {drawer && <div className="fixed inset-0 z-[90] bg-black/50 backdrop-blur-xs" onClick={() => setDrawer(false)} />}
-      <aside className={`fixed top-0 left-0 bottom-0 z-[100] w-72 max-w-[85%] bg-white dark:bg-slate-800 shadow-2xl transition-transform duration-300 flex flex-col ${drawer ? 'translate-x-0' : '-translate-x-full'}`}>
-        <div className="p-4 text-white flex items-center gap-3" style={{ background: S.accent }}>
-          <Logo s={44} />
-          <div className="min-w-0">
-            <div className="fm text-lg truncate font-bold">{S.brand}</div>
-            <div className="text-[11px] text-white/80 truncate font-mono">{user.email || 'Super Admin'}</div>
-          </div>
         </div>
         <nav className="p-3 space-y-1 flex-1 overflow-y-auto thin">
           {NAV.map(([id, ic, lb]) => (
             <button
               key={id}
-              onClick={() => { setPage(id); setDrawer(false); }}
+              onClick={() => setPage(id)}
               className={`w-full flex items-center gap-3 px-3.5 py-3 rounded-xl text-sm font-bold text-left transition ${page === id ? 'text-white shadow-sm' : 'hover:bg-slate-100 dark:hover:bg-slate-700/60 text-slate-700 dark:text-slate-200'}`}
               style={page === id ? { background: S.accent } : {}}
             >
               <span className="text-lg">{ic}</span>
               <span>{lb}</span>
-              {id === 'plans' && reqs.length > 0 && <span className="ml-auto text-[10px] bg-amber-400 text-slate-900 px-2 py-0.5 rounded-full font-black">{reqs.length}</span>}
+              {id === 'resets' && st.pendingResets > 0 && (
+                <span className="ml-auto text-[10px] bg-emerald-500 text-white px-2 py-0.5 rounded-full font-black animate-pulse">
+                  {st.pendingResets}
+                </span>
+              )}
+              {id === 'feedback' && st.pendingFeedbacks > 0 && (
+                <span className="ml-auto text-[10px] bg-rose-500 text-white px-2 py-0.5 rounded-full font-black">
+                  {st.pendingFeedbacks}
+                </span>
+              )}
+              {id === 'plans' && reqs.length > 0 && (
+                <span className="ml-auto text-[10px] bg-amber-400 text-slate-900 px-2 py-0.5 rounded-full font-black">{reqs.length}</span>
+              )}
               {id === 'masjids' && <span className="ml-auto text-[10px] opacity-70 font-mono font-bold">{st.total}</span>}
               {id === 'regions' && <span className="ml-auto text-[10px] bg-rose-100 text-rose-800 dark:bg-rose-950/60 dark:text-rose-300 px-1.5 py-0.5 rounded font-black">{st.susp}</span>}
             </button>
@@ -1218,839 +1355,1155 @@ function AdminApp() {
         </div>
       </aside>
 
-      {/* Main Page Content */}
-      <main className="max-w-7xl mx-auto p-3 sm:p-6 space-y-5">
+      {/* Screen Container Shifts smoothly to the side when Drawer is open */}
+      <div className={`transition-all duration-300 ${drawer ? 'md:pl-72' : 'pl-0'}`}>
+        {/* Top Header */}
+        <header className="sticky top-0 z-50 text-white shadow-md transition-all duration-300" style={{ background: `linear-gradient(90deg, ${S.accent}, #063b2c)` }}>
+          <div className="flex items-center gap-3 px-3 sm:px-5 h-16 max-w-7xl mx-auto">
+            {/* 3-Lines Menu Hamburger Icon (Click to toggle drawer open/close) */}
+            <button
+              onClick={() => setDrawer(prev => !prev)}
+              aria-label="Toggle Menu"
+              className={`w-10 h-10 rounded-xl flex flex-col items-center justify-center gap-[5px] transition ${drawer ? 'bg-white/30 ring-2 ring-white/50' : 'bg-white/15 hover:bg-white/25'}`}
+              title={drawer ? 'साइडबार बंद करें (Close Sidebar)' : 'साइडबार खोलें (Open Sidebar)'}
+            >
+              <i className="block w-5 h-0.5 bg-white rounded" />
+              <i className="block w-5 h-0.5 bg-white rounded" />
+              <i className="block w-5 h-0.5 bg-white rounded" />
+            </button>
 
-        {/* ============ PAGE 1: DASHBOARD ============ */}
-        {page === 'dashboard' && (
-          <>
-            <div className="flex flex-wrap items-center justify-between gap-2">
-              <div>
-                <h2 className="text-xl font-extrabold text-slate-900 dark:text-white">Dashboard Overview</h2>
-                <p className="text-xs text-slate-500 dark:text-slate-400">Real-time network status across all mosques in India</p>
-              </div>
-              <div className="flex gap-2">
-                <button onClick={() => setPage('regions')} className={`${B} bg-rose-50 text-rose-700 border border-rose-300 dark:bg-rose-950/40 dark:text-rose-300 dark:border-rose-800 flex items-center gap-1.5`}>
-                  <span>🗺️ 1-Click State/District Ban</span>
-                </button>
-                <button onClick={() => setPage('masjids')} className={`${B} text-white`} style={{ background: S.accent }}>
-                  <span>🕌 Manage Mosques</span>
-                </button>
-              </div>
+            <Logo s={38} />
+            <div className="min-w-0">
+              <div className="fm text-lg leading-tight truncate font-bold">{S.brand}</div>
+              <div className="text-[11px] text-white/70 truncate">{S.tagline}</div>
             </div>
-
-            {reqs.length > 0 && (
-              <button onClick={() => setPage('plans')} className="w-full text-left p-4 rounded-2xl bg-amber-100 dark:bg-amber-900/30 border-2 border-amber-400 font-bold text-sm text-slate-900 dark:text-amber-200 flex items-center justify-between">
-                <span>🔔 {reqs.length} payment verification request(s) waiting for your review</span>
-                <span className="underline">Review Now →</span>
+            <div className="ml-auto flex items-center gap-2">
+              {st.pendingResets > 0 && (
+                <button onClick={() => setPage('resets')} className="flex items-center gap-1 text-[11px] px-2.5 py-1 rounded-full bg-emerald-500 text-white font-black animate-pulse shadow-xs">
+                  <span>🔑 {st.pendingResets} Reset</span>
+                </button>
+              )}
+              {st.pendingFeedbacks > 0 && (
+                <button onClick={() => setPage('feedback')} className="flex items-center gap-1 text-[11px] px-2.5 py-1 rounded-full bg-rose-500 text-white font-black shadow-xs">
+                  <span>💬 {st.pendingFeedbacks} New</span>
+                </button>
+              )}
+              <span className="hidden sm:flex items-center gap-1.5 text-[11px] px-2.5 py-1 rounded-full bg-white/10 font-bold">
+                <i className={`w-2 h-2 rounded-full ${loaded ? 'bg-emerald-300' : 'bg-amber-300'}`} />
+                {loaded ? 'Firestore Live' : 'Connecting…'}
+              </span>
+              <button onClick={() => setDark(!dark)} className="w-10 h-10 rounded-xl bg-white/15 hover:bg-white/25 flex items-center justify-center text-sm transition" title="Toggle Theme">
+                {dark ? '☀️' : '🌙'}
               </button>
-            )}
-
-            {/* Quick 8 Metrics Grid */}
-            <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
-              {[
-                ['Total Mosques', st.total, `${st.active} Active · ${st.susp} Suspended`, '🕌'],
-                ['Paid (Active)', st.paid, `${st.free} Free · ${st.exp} Expired`, '💳'],
-                ['Revenue (Month)', '₹' + st.revMo, `Total Life: ₹${st.revAll}`, '💰'],
-                ['Followers', st.fol, `${st.live} Live Azan Broadcasting`, '⭐'],
-                ['Verified (Blue Tick)', st.ver, 'Active Badges Granted', '🔵'],
-                ['Expiring in 7 Days', st.soon.length, 'Need Renewal Reminder', '⏳'],
-                ['No GPS Coordinates', st.nogps, 'Requires Map Pin', '📍'],
-                ['Pending UTRs', reqs.length, 'Payment Verification Queue', '🔔']
-              ].map(([t, v, s, ic], i) => (
-                <div key={i} className={`${card} p-4 hover:shadow-md transition`}>
-                  <div className="flex justify-between text-[11px] font-bold text-slate-500 dark:text-slate-400 uppercase">
-                    <span>{t}</span>
-                    <span>{ic}</span>
-                  </div>
-                  <div className="text-2xl sm:text-3xl font-black mt-1" style={{ color: S.accent }}>{v}</div>
-                  <div className="text-[11px] text-slate-400 dark:text-slate-500 font-medium">{s}</div>
-                </div>
-              ))}
+              <button onClick={handleLogout} className="px-3 h-10 rounded-xl bg-rose-600/80 hover:bg-rose-600 text-xs font-bold transition">
+                Logout
+              </button>
             </div>
+          </div>
+        </header>
 
-            {/* Charts & Quick Action Sections */}
-            <div className="grid lg:grid-cols-2 gap-4">
-              {/* Mosques by State */}
-              <div className={`${card} p-4`}>
-                <div className="flex justify-between items-center mb-3">
-                  <h3 className="font-extrabold text-sm text-slate-900 dark:text-white">Mosques by State</h3>
-                  <button onClick={() => setPage('regions')} className="text-xs text-emerald-600 dark:text-emerald-400 font-bold hover:underline">
-                    Manage State Bans →
+        {/* Main Page Content */}
+        <main className="max-w-7xl mx-auto p-3 sm:p-6 space-y-5">
+
+          {/* ============ PAGE 1: DASHBOARD ============ */}
+          {page === 'dashboard' && (
+            <>
+              <div className="flex flex-wrap items-center justify-between gap-2">
+                <div>
+                  <h2 className="text-xl font-extrabold text-slate-900 dark:text-white">Dashboard Overview</h2>
+                  <p className="text-xs text-slate-500 dark:text-slate-400">Real-time network status across all mosques in India</p>
+                </div>
+                <div className="flex flex-wrap gap-2">
+                  <button onClick={() => setPage('resets')} className={`${B} bg-emerald-600 text-white flex items-center gap-1.5 shadow-xs`}>
+                    <span>🔑 Password Resets ({st.pendingResets})</span>
+                  </button>
+                  <button onClick={() => setPage('feedback')} className={`${B} bg-slate-200 dark:bg-slate-700 text-slate-800 dark:text-slate-200 flex items-center gap-1.5`}>
+                    <span>💬 शिकायतें ({st.pendingFeedbacks})</span>
+                  </button>
+                  <button onClick={() => setPage('regions')} className={`${B} bg-rose-50 text-rose-700 border border-rose-300 dark:bg-rose-950/40 dark:text-rose-300 dark:border-rose-800 flex items-center gap-1.5`}>
+                    <span>🗺️ ऑल इंडिया बैन</span>
+                  </button>
+                  <button onClick={() => setPage('masjids')} className={`${B} text-white`} style={{ background: S.accent }}>
+                    <span>🕌 Manage Mosques</span>
                   </button>
                 </div>
-                {st.byState.length === 0 ? (
-                  <p className="text-xs text-slate-400">No registered mosques yet</p>
-                ) : (
-                  st.byState.map(([k, v]) => (
-                    <div key={k} className="mb-2.5">
-                      <div className="flex justify-between text-xs mb-1">
-                        <span className="font-bold text-slate-700 dark:text-slate-300">{k}</span>
-                        <b className="font-mono text-slate-900 dark:text-white">{v}</b>
-                      </div>
-                      <div className="h-2 rounded-full bg-slate-100 dark:bg-slate-700 overflow-hidden">
-                        <div className="h-2 rounded-full transition-all duration-500" style={{ width: `${(v / (st.byState[0][1] || 1)) * 100}%`, background: S.accent }} />
-                      </div>
+              </div>
+
+              {/* Password Resets Alert Banner */}
+              {st.pendingResets > 0 && (
+                <div className="p-3.5 rounded-2xl bg-emerald-50 dark:bg-emerald-950/40 border-2 border-emerald-500 flex flex-wrap items-center justify-between gap-2">
+                  <div className="flex items-center gap-2">
+                    <span className="text-xl">🔔</span>
+                    <div>
+                      <h4 className="font-black text-xs text-emerald-900 dark:text-emerald-200">
+                        {st.pendingResets} इमाम ने पासवर्ड रीसेट का अनुरोध भेजा है!
+                      </h4>
+                      <p className="text-[11px] text-emerald-700 dark:text-emerald-400">
+                        1-Click में WhatsApp पर उनके रजिस्टर्ड मोबाइल नंबर पर मस्जिद ID और पासवर्ड भेजें।
+                      </p>
                     </div>
-                  ))
-                )}
-              </div>
-
-              {/* Expiring Soon & Fast Reminders */}
-              <div className={`${card} p-4`}>
-                <h3 className="font-extrabold text-sm mb-3 text-slate-900 dark:text-white">Plans Expiring in 7 Days</h3>
-                {st.soon.length === 0 ? (
-                  <p className="text-xs text-slate-400 py-6 text-center">No subscriptions expiring in the next 7 days 🎉</p>
-                ) : (
-                  <div className="space-y-2 max-h-64 overflow-y-auto thin">
-                    {st.soon.map(m => (
-                      <div key={m.id} className="flex items-center justify-between gap-2 py-2 border-b dark:border-slate-700 text-xs">
-                        <div className="min-w-0">
-                          <b className="block truncate text-slate-900 dark:text-white">{m.name}</b>
-                          <span className="text-slate-500 dark:text-slate-400">{m.paymentExpiry} · {daysLeft(m.paymentExpiry)} day(s) remaining</span>
-                        </div>
-                        <a
-                          target="_blank"
-                          rel="noreferrer"
-                          className={`${B} bg-[#25D366] text-white shrink-0 flex items-center gap-1 shadow-xs`}
-                          href={waLink(m.phone, `Assalamu Alaikum Hazrat ${m.imamName || ''},\nYour ${S.brand} plan for ${m.name} ends on ${m.paymentExpiry}. UPI: ${S.upiId}`)}
-                        >
-                          💬 WhatsApp Remind
-                        </a>
-                      </div>
-                    ))}
                   </div>
-                )}
-              </div>
-            </div>
-          </>
-        )}
+                  <button onClick={() => setPage('resets')} className={`${B} bg-emerald-600 text-white font-black`}>
+                    व्हाट्सएप पर भेजें →
+                  </button>
+                </div>
+              )}
 
-        {/* ============ PAGE 2: MOSQUES MANAGEMENT (ADVANCED FILTERING & EXPORT) ============ */}
-        {page === 'masjids' && (
-          <>
-            <div className="flex flex-wrap items-end justify-between gap-2">
-              <div>
-                <h2 className="text-xl font-extrabold text-slate-900 dark:text-white">Mosques Directory</h2>
-                <p className="text-xs text-slate-500 dark:text-slate-400">
-                  Showing <b>{list.length}</b> of <b>{all.length}</b> mosques (Filter lagakar CSV ya JSON download karein)
-                </p>
-              </div>
-              <div className="flex flex-wrap gap-2">
-                <button onClick={() => exportCsv(list)} className={`${B} text-white shadow-xs flex items-center gap-1`} style={{ background: S.accent }}>
-                  <span>📥 Export Filtered CSV ({list.length})</span>
-                </button>
-                <button onClick={() => exportJson(list)} className={`${B} bg-slate-200 dark:bg-slate-700 text-slate-800 dark:text-slate-200 shadow-xs flex items-center gap-1`}>
-                  <span>📋 Export JSON ({list.length})</span>
-                </button>
-              </div>
-            </div>
+              {/* Feedback and Complaints Alert Banner */}
+              {st.pendingFeedbacks > 0 && (
+                <div className="p-3.5 rounded-2xl bg-amber-50 dark:bg-amber-950/40 border-2 border-amber-400 flex flex-wrap items-center justify-between gap-2">
+                  <div className="flex items-center gap-2">
+                    <span className="text-xl">💬</span>
+                    <div>
+                      <h4 className="font-black text-xs text-amber-900 dark:text-amber-200">
+                        {st.pendingFeedbacks} नई शिकायत या सुझाव प्राप्त हुए हैं!
+                      </h4>
+                      <p className="text-[11px] text-amber-700 dark:text-amber-400">
+                        इमाम व मुक़्तदियों के सुझाव देखें व समीक्षा करें।
+                      </p>
+                    </div>
+                  </div>
+                  <button onClick={() => setPage('feedback')} className={`${B} bg-amber-500 text-slate-900 font-black`}>
+                    शिकायतें देखें →
+                  </button>
+                </div>
+              )}
 
-            {/* Advanced 4-Column Filter Bar */}
-            <div className={`${card} p-3.5 grid sm:grid-cols-2 lg:grid-cols-4 gap-2.5`}>
-              <div>
-                <label className="block text-[11px] font-bold text-slate-500 dark:text-slate-400 mb-1">🔍 Search Name, ID, Phone, Imam</label>
+              {reqs.length > 0 && (
+                <button onClick={() => setPage('plans')} className="w-full text-left p-4 rounded-2xl bg-amber-100 dark:bg-amber-900/30 border-2 border-amber-400 font-bold text-sm text-slate-900 dark:text-amber-200 flex items-center justify-between">
+                  <span>🔔 {reqs.length} payment verification request(s) waiting for your review</span>
+                  <span className="underline">Review Now →</span>
+                </button>
+              )}
+
+              {/* Metrics Grid */}
+              <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
+                {[
+                  ['Total Mosques', st.total, `${st.active} Active · ${st.susp} Suspended`, '🕌'],
+                  ['Paid Subscriptions', st.paid, `Active Money: ₹${st.activePaidRev}`, '💳'],
+                  ['Total Verified Revenue', '₹' + st.revAll, `This Month: ₹${st.revMo}`, '💰'],
+                  ['Followers (Muqtadi)', st.fol, `${st.live} Live Azan Broadcasting`, '👥'],
+                  ['Verified (Blue Tick)', st.ver, 'Active Badges Granted', '🔵'],
+                  ['Password Resets', st.pendingResets, 'Pending 1-Click WhatsApp', '🔑'],
+                  ['Complaints & Feedback', st.pendingFeedbacks, 'User Suggestions', '💬'],
+                  ['Pending UTRs', reqs.length, 'Payment Verification Queue', '🔔']
+                ].map(([t, v, s, ic], i) => (
+                  <div key={i} className={`${card} p-4 hover:shadow-md transition`}>
+                    <div className="flex justify-between text-[11px] font-bold text-slate-500 dark:text-slate-400 uppercase">
+                      <span>{t}</span>
+                      <span>{ic}</span>
+                    </div>
+                    <div className="text-2xl sm:text-3xl font-black mt-1" style={{ color: S.accent }}>{v}</div>
+                    <div className="text-[11px] text-slate-400 dark:text-slate-500 font-medium">{s}</div>
+                  </div>
+                ))}
+              </div>
+
+              {/* Charts & Quick Action Sections */}
+              <div className="grid lg:grid-cols-2 gap-4">
+                <div className={`${card} p-4`}>
+                  <div className="flex justify-between items-center mb-3">
+                    <h3 className="font-extrabold text-sm text-slate-900 dark:text-white">Mosques by State</h3>
+                    <button onClick={() => setPage('regions')} className="text-xs text-emerald-600 dark:text-emerald-400 font-bold hover:underline">
+                      Manage State Bans →
+                    </button>
+                  </div>
+                  {st.byState.length === 0 ? (
+                    <p className="text-xs text-slate-400">No registered mosques yet</p>
+                  ) : (
+                    st.byState.map(([k, v]) => (
+                      <div key={k} className="mb-2.5">
+                        <div className="flex justify-between text-xs mb-1">
+                          <span className="font-bold text-slate-700 dark:text-slate-300">{k}</span>
+                          <b className="font-mono text-slate-900 dark:text-white">{v}</b>
+                        </div>
+                        <div className="h-2 rounded-full bg-slate-100 dark:bg-slate-700 overflow-hidden">
+                          <div className="h-2 rounded-full transition-all duration-500" style={{ width: `${(v / (st.byState[0][1] || 1)) * 100}%`, background: S.accent }} />
+                        </div>
+                      </div>
+                    ))
+                  )}
+                </div>
+
+                <div className={`${card} p-4`}>
+                  <h3 className="font-extrabold text-sm mb-3 text-slate-900 dark:text-white">Plans Expiring in 7 Days</h3>
+                  {st.soon.length === 0 ? (
+                    <p className="text-xs text-slate-400 py-6 text-center">No subscriptions expiring in the next 7 days 🎉</p>
+                  ) : (
+                    <div className="space-y-2 max-h-64 overflow-y-auto thin">
+                      {st.soon.map(m => (
+                        <div key={m.id} className="flex items-center justify-between gap-2 py-2 border-b dark:border-slate-700 text-xs">
+                          <div className="min-w-0">
+                            <b className="block truncate text-slate-900 dark:text-white">{m.name}</b>
+                            <span className="text-slate-500 dark:text-slate-400">{m.paymentExpiry} · {daysLeft(m.paymentExpiry)} day(s) remaining</span>
+                          </div>
+                          <a
+                            target="_blank"
+                            rel="noreferrer"
+                            className={`${B} bg-[#25D366] text-white shrink-0 flex items-center gap-1 shadow-xs`}
+                            href={waLink(m.phone, `Assalamu Alaikum Hazrat ${m.imamName || ''},\nYour ${S.brand} plan for ${m.name} ends on ${m.paymentExpiry}. UPI: ${S.upiId}`)}
+                          >
+                            💬 WhatsApp Remind
+                          </a>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              </div>
+            </>
+          )}
+
+          {/* ============ PAGE 2: MOSQUES MANAGEMENT (WITH FOLLOWER BADGE) ============ */}
+          {page === 'masjids' && (
+            <>
+              <div className="flex flex-wrap items-end justify-between gap-2">
+                <div>
+                  <h2 className="text-xl font-extrabold text-slate-900 dark:text-white">Mosques Directory</h2>
+                  <p className="text-xs text-slate-500 dark:text-slate-400">
+                    Showing <b>{list.length}</b> of <b>{all.length}</b> mosques (फ़ॉलोअर्स, लाइव अज़ान, व ब्लू टिक स्थिति)
+                  </p>
+                </div>
+                <div className="flex flex-wrap gap-2">
+                  <button onClick={() => exportCsv(list)} className={`${B} text-white shadow-xs flex items-center gap-1`} style={{ background: S.accent }}>
+                    <span>📥 Export Filtered CSV ({list.length})</span>
+                  </button>
+                  <button onClick={() => exportJson(list)} className={`${B} bg-slate-200 dark:bg-slate-700 text-slate-800 dark:text-slate-200 shadow-xs flex items-center gap-1`}>
+                    <span>📋 Export JSON ({list.length})</span>
+                  </button>
+                </div>
+              </div>
+
+              {/* Advanced 4-Column Filter Bar */}
+              <div className={`${card} p-3.5 grid sm:grid-cols-2 lg:grid-cols-4 gap-2.5`}>
+                <div>
+                  <label className="block text-[11px] font-bold text-slate-500 dark:text-slate-400 mb-1">🔍 Search Name, ID, Phone, Imam</label>
+                  <input
+                    className={inp}
+                    placeholder="e.g. Jama Masjid, Mau, Ballia, 9876…"
+                    value={q}
+                    onChange={e => setQ(e.target.value)}
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-[11px] font-bold text-slate-500 dark:text-slate-400 mb-1">🏛️ State Filter (Smart Normalized)</label>
+                  <select className={inp} value={fState} onChange={e => { setFState(e.target.value); setFDistrict('all'); }}>
+                    <option value="all">All States ({statesInDb.length})</option>
+                    {statesInDb.map(s => <option key={s} value={s}>{s}</option>)}
+                  </select>
+                </div>
+
+                <div>
+                  <label className="block text-[11px] font-bold text-slate-500 dark:text-slate-400 mb-1">🏙️ District / City Filter</label>
+                  <select className={inp} value={fDistrict} onChange={e => setFDistrict(e.target.value)}>
+                    <option value="all">All Districts ({districtsInDb.length})</option>
+                    {districtsInDb.map(d => <option key={d} value={d}>{d}</option>)}
+                  </select>
+                </div>
+
+                <div>
+                  <label className="block text-[11px] font-bold text-slate-500 dark:text-slate-400 mb-1">⚙️ Status & Permissions Filter</label>
+                  <select className={inp} value={fStat} onChange={e => setFStat(e.target.value)}>
+                    <option value="all">All Status</option>
+                    <option value="paid">💰 Paid Mosques</option>
+                    <option value="free">🎁 Free Mosques</option>
+                    <option value="expired">⚠️ Expired (Locked)</option>
+                    <option value="pending">⏳ Pending UTR Review</option>
+                    <option value="suspended">🚫 Suspended / Banned</option>
+                    <option value="verified">🔵 Verified (Blue Tick)</option>
+                    <option value="live">🔴 Live Azan Now</option>
+                    <option value="azan_blocked">🔇 Live Azan Blocked (Manual)</option>
+                    <option value="edit_locked">🔒 Time Edit Locked (Manual)</option>
+                    <option value="nogps">📍 Location / GPS Missing</option>
+                  </select>
+                </div>
+              </div>
+
+              {/* Active Filters Summary Pills */}
+              {(q || fState !== 'all' || fDistrict !== 'all' || fStat !== 'all') && (
+                <div className="flex flex-wrap items-center gap-1.5 text-xs">
+                  <span className="font-bold text-slate-500">Active Filters:</span>
+                  {q && <span className="bg-slate-200 dark:bg-slate-700 px-2 py-0.5 rounded-full font-bold">Search: "{q}"</span>}
+                  {fState !== 'all' && <span className="bg-emerald-100 text-emerald-800 dark:bg-emerald-950/60 dark:text-emerald-300 px-2 py-0.5 rounded-full font-bold">State: {fState}</span>}
+                  {fDistrict !== 'all' && <span className="bg-sky-100 text-sky-800 dark:bg-sky-950/60 dark:text-sky-300 px-2 py-0.5 rounded-full font-bold">District: {fDistrict}</span>}
+                  {fStat !== 'all' && <span className="bg-amber-100 text-amber-800 dark:bg-amber-950/60 dark:text-amber-300 px-2 py-0.5 rounded-full font-bold">Status: {fStat}</span>}
+                  <button onClick={() => { setQ(''); setFState('all'); setFDistrict('all'); setFStat('all'); }} className="text-rose-600 dark:text-rose-400 font-bold ml-1 hover:underline">
+                    ✕ Clear All Filters
+                  </button>
+                </div>
+              )}
+
+              {!loaded ? (
+                <p className="text-sm text-slate-400 text-center py-10">Loading mosques…</p>
+              ) : list.length === 0 ? (
+                <div className={`${card} p-10 text-center text-sm text-slate-400`}>No mosques match the selected filters.</div>
+              ) : (
+                <div className="space-y-3">
+                  {list.map(m => {
+                    const s = eff(m);
+                    const la = m.liveAzanAllowed !== false;
+                    const te = m.timeEditAllowed !== false;
+                    const isVer = !!m.isVerified;
+                    const isSusp = !!m.isSuspended;
+
+                    return (
+                      <div key={m.id} className={`${card} p-3 sm:p-4 flex flex-col lg:flex-row gap-3 lg:items-center ${isSusp ? 'opacity-65 border-rose-300 dark:border-rose-900 bg-rose-50/20 dark:bg-rose-950/20' : ''}`}>
+                        <div className="flex gap-3 flex-1 min-w-0">
+                          <img
+                            src={m.photo || 'https://images.unsplash.com/photo-1542816417-0983c9c9ad53?auto=format&fit=crop&w=300&q=60'}
+                            alt=""
+                            className="w-16 h-16 rounded-xl object-cover shrink-0 border border-slate-200 dark:border-slate-700"
+                          />
+                          <div className="min-w-0">
+                            <div className="flex flex-wrap items-center gap-1.5">
+                              <b className="text-sm break-words text-slate-900 dark:text-white">{m.name}</b>
+                              {isVer && <Chip c="bg-sky-500 text-white shadow-xs font-black">✓ Verified</Chip>}
+                              {isSusp && <Chip c="bg-rose-600 text-white font-black">🚫 SUSPENDED</Chip>}
+                              {live[m.id] && <Chip c="bg-rose-600 text-white animate-pulse font-black">● LIVE AZAN</Chip>}
+                            </div>
+                            <div className="text-xs text-slate-500 dark:text-slate-400 break-words mt-0.5">
+                              📍 {[m.address, m.stateLocation, normalizeState(m.stateName) || m.stateName].filter(Boolean).join(', ')}
+                            </div>
+                            <div className="flex flex-wrap items-center gap-1.5 mt-1.5">
+                              <Chip c="bg-slate-100 dark:bg-slate-700 font-mono text-slate-700 dark:text-slate-300">ID: {m.id}</Chip>
+                              {/* Display Followers prominently */}
+                              <Chip c="bg-emerald-100 text-emerald-800 dark:bg-emerald-950/60 dark:text-emerald-300 font-bold">
+                                👥 {m.followersCount || 0} फ़ॉलोअर्स
+                              </Chip>
+                              <Chip c={STAT[s] || STAT.free}>{s.toUpperCase()}{m.paymentExpiry && s === 'paid' ? ` · ${daysLeft(m.paymentExpiry)}d` : ''}</Chip>
+                              <Chip c={la ? 'bg-emerald-100 text-emerald-800 dark:bg-emerald-950/60 dark:text-emerald-300' : 'bg-rose-100 text-rose-800 dark:bg-rose-950/60 dark:text-rose-300 font-bold'}>
+                                Azan {la ? 'ON' : 'BLOCKED'}
+                              </Chip>
+                              <Chip c={te ? 'bg-emerald-100 text-emerald-800 dark:bg-emerald-950/60 dark:text-emerald-300' : 'bg-rose-100 text-rose-800 dark:bg-rose-950/60 dark:text-rose-300 font-bold'}>
+                                Edit {te ? 'ON' : 'LOCKED'}
+                              </Chip>
+                              {!hasGps(m) && <Chip c="bg-amber-100 text-amber-800 dark:bg-amber-950/60 dark:text-amber-300">No GPS</Chip>}
+                            </div>
+                          </div>
+                        </div>
+
+                        {/* Controls */}
+                        <div className="flex flex-wrap gap-1.5 lg:justify-end shrink-0">
+                          <button onClick={() => setView(m)} className={`${B} text-white shadow-xs`} style={{ background: S.accent }}>
+                            👁️ View
+                          </button>
+                          {/* 1-Click WhatsApp Login Sender */}
+                          {m.phone && (
+                            <a
+                              target="_blank"
+                              rel="noreferrer"
+                              href={waLink(m.phone, `अस्सलाम अलैकुम हज़रत ${m.imamName || ''},\n\nमस्जिद कनेक्ट ऐप में आपकी मस्जिद का लॉगिन विवरण:\n🕌 मस्जिद: ${m.name}\n🆔 मस्जिद ID: ${m.id}\n🔑 पासवर्ड (PIN): ${m.passcode}\n\nऐप में इस ID और पासवर्ड से लॉगिन करें।`)}
+                              className={`${B} bg-[#25D366] text-white flex items-center gap-1 shadow-xs`}
+                              title="1-Click WhatsApp Par ID-Password Bhejein"
+                            >
+                              💬 ID/Pass
+                            </a>
+                          )}
+                          <button
+                            onClick={() => toggleFlag(m, 'isVerified', 'Verified Blue Tick')}
+                            className={`${B} ${isVer ? 'bg-sky-500 text-white shadow-xs font-black' : 'bg-sky-50 text-sky-800 border border-sky-300 dark:bg-sky-950/40 dark:text-sky-300'}`}
+                            title={isVer ? 'Remove Verified Blue Tick' : 'Grant Verified Blue Tick'}
+                          >
+                            {isVer ? '✓ Blue Tick' : '🔵 Blue Tick'}
+                          </button>
+                          <button
+                            onClick={() => toggle(m, 'liveAzanAllowed', 'Live Azan')}
+                            className={`${B} ${la ? 'bg-rose-50 text-rose-700 border border-rose-300 dark:bg-rose-950/40 dark:text-rose-300 dark:border-rose-800' : 'bg-emerald-600 text-white'}`}
+                            title={la ? 'Block Live Azan for this mosque' : 'Allow Live Azan'}
+                          >
+                            {la ? 'Block Azan' : 'Allow Azan'}
+                          </button>
+                          <button
+                            onClick={() => toggle(m, 'timeEditAllowed', 'Time editing')}
+                            className={`${B} ${te ? 'bg-slate-100 dark:bg-slate-700 text-slate-800 dark:text-slate-200' : 'bg-emerald-600 text-white'}`}
+                            title={te ? 'Lock Namaz Time editing' : 'Unlock Namaz Time editing'}
+                          >
+                            {te ? 'Lock Edit' : 'Unlock Edit'}
+                          </button>
+                          <button
+                            onClick={() => toggleFlag(m, 'isSuspended', 'Suspension')}
+                            className={`${B} ${isSusp ? 'bg-emerald-600 text-white font-black' : 'bg-rose-100 text-rose-800 border border-rose-300 dark:bg-rose-950/40 dark:text-rose-300'}`}
+                            title={isSusp ? 'Restore Mosque to App' : 'Suspend Mosque (Hide from app)'}
+                          >
+                            {isSusp ? '✅ Restore' : '🚫 Suspend'}
+                          </button>
+                          <button onClick={() => setPlanM(m)} className={`${B} bg-amber-400 text-slate-900 font-extrabold shadow-xs`}>
+                            💳 Plan
+                          </button>
+                          <button onClick={() => setEdit(m)} className={`${B} bg-slate-100 dark:bg-slate-700 text-slate-800 dark:text-slate-200`} title="Edit Mosque">
+                            ✏️
+                          </button>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
+            </>
+          )}
+
+          {/* ============ PAGE 3: SMART ALL-INDIA STATE & DISTRICT BAN CONTROLLER ============ */}
+          {page === 'regions' && (
+            <>
+              <div className="flex flex-wrap items-center justify-between gap-2">
+                <div>
+                  <h2 className="text-xl font-extrabold text-slate-900 dark:text-white">All-India State & District Ban Controller</h2>
+                  <p className="text-xs text-slate-500 dark:text-slate-400">
+                    पूरे देश के सभी 36 राज्यों व केंद्र शासित प्रदेशों और उनके ज़िलों को 1-क्लिक में बैन या प्री-बैन करें।
+                  </p>
+                </div>
                 <input
-                  className={inp}
-                  placeholder="e.g. Jama Masjid, Mau, Ballia, 9876…"
-                  value={q}
-                  onChange={e => setQ(e.target.value)}
+                  className={`${inp} max-w-xs`}
+                  placeholder="🔍 Search state or district…"
+                  value={regionFilter}
+                  onChange={e => setRegionFilter(e.target.value)}
                 />
               </div>
 
-              <div>
-                <label className="block text-[11px] font-bold text-slate-500 dark:text-slate-400 mb-1">🏛️ State Filter (Smart Normalized)</label>
-                <select className={inp} value={fState} onChange={e => { setFState(e.target.value); setFDistrict('all'); }}>
-                  <option value="all">All States ({statesInDb.length})</option>
-                  {statesInDb.map(s => <option key={s} value={s}>{s}</option>)}
-                </select>
+              {/* ALL-INDIA 1-CLICK SELECTOR BAN CARD (FOR ANY STATE AND ANY DISTRICT) */}
+              <div className={`${card} p-4 sm:p-5 border-2 border-rose-500 bg-rose-50/50 dark:bg-rose-950/20 space-y-3.5`}>
+                <div className="flex items-center gap-2">
+                  <span className="text-xl">🎯</span>
+                  <h3 className="font-black text-sm text-rose-900 dark:text-rose-200 uppercase tracking-wide">
+                    All-India Quick Ban Selector (पूरे देश का कोई भी राज्य या ज़िला बैन करें)
+                  </h3>
+                </div>
+                <p className="text-xs text-slate-600 dark:text-slate-300">
+                  चाहे उस राज्य या ज़िले में अभी कोई मस्जिद रजिस्टर हुई हो या नहीं — आप यहाँ से <b>Mau, Ballia, Azamgarh, Patna</b> या किसी भी राज्य/ज़िले को प्री-बैन कर सकते हैं।
+                </p>
+
+                <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-3 pt-1">
+                  {/* State Picker (All 36 States) */}
+                  <div>
+                    <label className="block text-xs font-bold text-slate-700 dark:text-slate-200 mb-1">
+                      1. राज्य चुनें (Select State - 36 States/UTs)
+                    </label>
+                    <select
+                      className={inp}
+                      value={selBanState}
+                      onChange={e => {
+                        setSelBanState(e.target.value);
+                        setSelBanDistrict('');
+                      }}
+                    >
+                      {ALL_INDIA_STATES.map(stName => {
+                        const count = all.filter(m => isMosqueInState(m, stName)).length;
+                        return (
+                          <option key={stName} value={stName}>
+                            {stName} ({count} Mosques in DB)
+                          </option>
+                        );
+                      })}
+                    </select>
+                  </div>
+
+                  {/* District Picker of that State */}
+                  <div>
+                    <label className="block text-xs font-bold text-slate-700 dark:text-slate-200 mb-1">
+                      2. ज़िला चुनें (Select District of {selBanState})
+                    </label>
+                    <select
+                      className={inp}
+                      value={selBanDistrict}
+                      onChange={e => setSelBanDistrict(e.target.value)}
+                    >
+                      <option value="">-- ज़िला चुनें (Select District) --</option>
+                      {(INDIA_STATE_DISTRICTS[selBanState] || []).map(dist => {
+                        const count = all.filter(m => isMosqueInDistrict(m, dist)).length;
+                        return (
+                          <option key={dist} value={dist}>
+                            {dist} ({count} Mosques)
+                          </option>
+                        );
+                      })}
+                    </select>
+                  </div>
+
+                  {/* Action Buttons */}
+                  <div className="flex items-end gap-2">
+                    <button
+                      type="button"
+                      onClick={() => handleBanState(selBanState)}
+                      className={`${B} bg-rose-600 hover:bg-rose-700 text-white flex-1 py-2.5 font-black shadow-md flex items-center justify-center gap-1`}
+                    >
+                      <span>🚫 पूरा राज्य बैन करें</span>
+                    </button>
+                    {selBanDistrict && (
+                      <button
+                        type="button"
+                        onClick={() => handleBanDistrict(selBanDistrict, selBanState)}
+                        className={`${B} bg-rose-800 hover:bg-rose-900 text-white flex-1 py-2.5 font-black shadow-md flex items-center justify-center gap-1`}
+                      >
+                        <span>🚫 ज़िला बैन करें</span>
+                      </button>
+                    )}
+                  </div>
+                </div>
+
+                {/* Custom write-in input for any village / town */}
+                <form
+                  onSubmit={e => {
+                    e.preventDefault();
+                    if (!customBanInput.trim()) return;
+                    handleBanDistrict(customBanInput.trim(), selBanState);
+                    setCustomBanInput('');
+                  }}
+                  className="pt-2 border-t border-rose-200 dark:border-rose-900/60 flex flex-wrap gap-2 items-center"
+                >
+                  <span className="text-xs font-bold text-slate-600 dark:text-slate-300">अन्य कोई कस्बा / मोहल्ला / ज़िला लिखें:</span>
+                  <input
+                    className={`${inp} max-w-xs`}
+                    placeholder="e.g. Mau, Ballia, Kopaganj..."
+                    value={customBanInput}
+                    onChange={e => setCustomBanInput(e.target.value)}
+                  />
+                  <button type="submit" className={`${B} bg-rose-600 text-white font-bold`}>
+                    + बैन सूची में जोड़ें
+                  </button>
+                </form>
               </div>
 
-              <div>
-                <label className="block text-[11px] font-bold text-slate-500 dark:text-slate-400 mb-1">🏙️ District / City Filter</label>
-                <select className={inp} value={fDistrict} onChange={e => setFDistrict(e.target.value)}>
-                  <option value="all">All Districts ({districtsInDb.length})</option>
-                  {districtsInDb.map(d => <option key={d} value={d}>{d}</option>)}
-                </select>
-              </div>
+              {/* ACTIVE BLACKLIST (BANNED REGIONS CHIPS) */}
+              {((S.bannedStates && S.bannedStates.length > 0) || (S.bannedDistricts && S.bannedDistricts.length > 0)) && (
+                <div className={`${card} p-4 space-y-2 border-2 border-rose-500`}>
+                  <div className="flex items-center justify-between">
+                    <h4 className="font-extrabold text-sm text-rose-700 dark:text-rose-300 flex items-center gap-2">
+                      <span>⛔ Currently Active Banned Regions (Blacklist)</span>
+                      <span className="text-[10px] bg-rose-600 text-white px-2 py-0.5 rounded-full font-mono">
+                        {(S.bannedStates?.length || 0) + (S.bannedDistricts?.length || 0)} Banned
+                      </span>
+                    </h4>
+                  </div>
 
-              <div>
-                <label className="block text-[11px] font-bold text-slate-500 dark:text-slate-400 mb-1">⚙️ Status & Permissions Filter</label>
-                <select className={inp} value={fStat} onChange={e => setFStat(e.target.value)}>
-                  <option value="all">All Status</option>
-                  <option value="paid">💰 Paid Mosques</option>
-                  <option value="free">🎁 Free Mosques</option>
-                  <option value="expired">⚠️ Expired (Locked)</option>
-                  <option value="pending">⏳ Pending UTR Review</option>
-                  <option value="suspended">🚫 Suspended / Banned</option>
-                  <option value="verified">🔵 Verified (Blue Tick)</option>
-                  <option value="live">🔴 Live Azan Now</option>
-                  <option value="azan_blocked">🔇 Live Azan Blocked (Manual)</option>
-                  <option value="edit_locked">🔒 Time Edit Locked (Manual)</option>
-                  <option value="nogps">📍 Location / GPS Missing</option>
-                </select>
-              </div>
-            </div>
+                  <div className="flex flex-wrap gap-2 pt-1">
+                    {(S.bannedStates || []).map(s => {
+                      const matchCount = all.filter(m => isMosqueInState(m, s)).length;
+                      return (
+                        <span key={s} className="inline-flex items-center gap-1.5 px-3 py-1 rounded-xl bg-rose-100 text-rose-900 dark:bg-rose-900/60 dark:text-rose-100 text-xs font-bold border border-rose-300 dark:border-rose-700 shadow-xs">
+                          <span>🏛️ State: <b>{s}</b> ({matchCount} Mosques)</span>
+                          <button type="button" onClick={() => handleUnbanState(s)} className="w-4 h-4 rounded-full bg-rose-300 dark:bg-rose-800 hover:bg-rose-400 flex items-center justify-center text-[10px] ml-1 font-black" title="Unban State">✕</button>
+                        </span>
+                      );
+                    })}
+                    {(S.bannedDistricts || []).map(d => {
+                      const matchCount = all.filter(m => isMosqueInDistrict(m, d)).length;
+                      return (
+                        <span key={d} className="inline-flex items-center gap-1.5 px-3 py-1 rounded-xl bg-rose-100 text-rose-900 dark:bg-rose-900/60 dark:text-rose-100 text-xs font-bold border border-rose-300 dark:border-rose-700 shadow-xs">
+                          <span>🏙️ District: <b>{d}</b> ({matchCount} Mosques)</span>
+                          <button type="button" onClick={() => handleUnbanDistrict(d)} className="w-4 h-4 rounded-full bg-rose-300 dark:bg-rose-800 hover:bg-rose-400 flex items-center justify-center text-[10px] ml-1 font-black" title="Unban District">✕</button>
+                        </span>
+                      );
+                    })}
+                  </div>
+                </div>
+              )}
 
-            {/* Active Filters Summary Pills */}
-            {(q || fState !== 'all' || fDistrict !== 'all' || fStat !== 'all') && (
-              <div className="flex flex-wrap items-center gap-1.5 text-xs">
-                <span className="font-bold text-slate-500">Active Filters:</span>
-                {q && <span className="bg-slate-200 dark:bg-slate-700 px-2 py-0.5 rounded-full font-bold">Search: "{q}"</span>}
-                {fState !== 'all' && <span className="bg-emerald-100 text-emerald-800 dark:bg-emerald-950/60 dark:text-emerald-300 px-2 py-0.5 rounded-full font-bold">State: {fState}</span>}
-                {fDistrict !== 'all' && <span className="bg-sky-100 text-sky-800 dark:bg-sky-950/60 dark:text-sky-300 px-2 py-0.5 rounded-full font-bold">District: {fDistrict}</span>}
-                {fStat !== 'all' && <span className="bg-amber-100 text-amber-800 dark:bg-amber-950/60 dark:text-amber-300 px-2 py-0.5 rounded-full font-bold">Status: {fStat}</span>}
-                <button onClick={() => { setQ(''); setFState('all'); setFDistrict('all'); setFStat('all'); }} className="text-rose-600 dark:text-rose-400 font-bold ml-1 hover:underline">
-                  ✕ Clear All Filters
-                </button>
-              </div>
-            )}
+              {/* ALL 36 STATES LIST WITH 1-CLICK BAN CONTROLS */}
+              <div className={`${card} p-4 sm:p-5 space-y-4`}>
+                <div className="flex flex-wrap items-center justify-between border-b dark:border-slate-700 pb-3 gap-2">
+                  <div>
+                    <h3 className="font-extrabold text-base text-slate-900 dark:text-white flex items-center gap-2">
+                      <span>🏛️ All 36 States & Union Territories of India</span>
+                      <span className="text-xs bg-slate-100 dark:bg-slate-700 px-2 py-0.5 rounded-full font-mono">36 Total</span>
+                    </h3>
+                    <p className="text-xs text-slate-500 dark:text-slate-400">किसी भी राज्य को सीधे यहाँ से 1-क्लिक में बैन या अनबैन करें।</p>
+                  </div>
+                  <div className="flex gap-2">
+                    <button
+                      onClick={() => setShowAllStatesView(!showAllStatesView)}
+                      className={`${B} bg-slate-100 dark:bg-slate-700 text-slate-800 dark:text-slate-200`}
+                    >
+                      {showAllStatesView ? 'दिखाएँ: केवल रजिस्टर्ड राज्य' : 'दिखाएँ: सभी 36 राज्य'}
+                    </button>
+                  </div>
+                </div>
 
-            {!loaded ? (
-              <p className="text-sm text-slate-400 text-center py-10">Loading mosques…</p>
-            ) : list.length === 0 ? (
-              <div className={`${card} p-10 text-center text-sm text-slate-400`}>No mosques match the selected filters.</div>
-            ) : (
-              <div className="space-y-3">
-                {list.map(m => {
-                  const s = eff(m);
-                  const la = m.liveAzanAllowed !== false;
-                  const te = m.timeEditAllowed !== false;
-                  const isVer = !!m.isVerified;
-                  const isSusp = !!m.isSuspended;
-
-                  return (
-                    <div key={m.id} className={`${card} p-3 sm:p-4 flex flex-col lg:flex-row gap-3 lg:items-center ${isSusp ? 'opacity-65 border-rose-300 dark:border-rose-900 bg-rose-50/20 dark:bg-rose-950/20' : ''}`}>
-                      <div className="flex gap-3 flex-1 min-w-0">
-                        <img
-                          src={m.photo || 'https://images.unsplash.com/photo-1542816417-0983c9c9ad53?auto=format&fit=crop&w=300&q=60'}
-                          alt=""
-                          className="w-16 h-16 rounded-xl object-cover shrink-0 border border-slate-200 dark:border-slate-700"
-                        />
-                        <div className="min-w-0">
-                          <div className="flex flex-wrap items-center gap-1.5">
-                            <b className="text-sm break-words text-slate-900 dark:text-white">{m.name}</b>
-                            {isVer && <Chip c="bg-sky-500 text-white shadow-xs font-black">✓ Verified</Chip>}
-                            {isSusp && <Chip c="bg-rose-600 text-white font-black">🚫 SUSPENDED</Chip>}
-                            {live[m.id] && <Chip c="bg-rose-600 text-white animate-pulse font-black">● LIVE AZAN</Chip>}
+                <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-3">
+                  {allIndiaStatesData
+                    .filter(s => showAllStatesView ? true : s.total > 0)
+                    .filter(s => !regionFilter || s.name.toLowerCase().includes(regionFilter.toLowerCase()))
+                    .map(s => (
+                      <div
+                        key={s.name}
+                        className={`p-3.5 rounded-xl border flex flex-col justify-between gap-3 ${s.isFullyBanned ? 'bg-rose-50/80 dark:bg-rose-950/30 border-rose-300 dark:border-rose-900' : s.isPartiallyBanned ? 'bg-amber-50/80 dark:bg-amber-950/20 border-amber-300 dark:border-amber-900' : 'bg-slate-50 dark:bg-slate-700/40 border-slate-200 dark:border-slate-700'}`}
+                      >
+                        <div>
+                          <div className="flex justify-between items-start gap-1">
+                            <h4 className="font-black text-sm text-slate-900 dark:text-white truncate">{s.name}</h4>
+                            {s.isFullyBanned ? (
+                              <Chip c="bg-rose-600 text-white font-black">BANNED</Chip>
+                            ) : s.isPartiallyBanned ? (
+                              <Chip c="bg-amber-500 text-slate-900 font-bold">PARTIAL</Chip>
+                            ) : (
+                              <Chip c="bg-emerald-600 text-white font-bold">{s.total > 0 ? 'ACTIVE' : 'READY'}</Chip>
+                            )}
                           </div>
-                          <div className="text-xs text-slate-500 dark:text-slate-400 break-words mt-0.5">
-                            📍 {[m.address, m.stateLocation, normalizeState(m.stateName) || m.stateName].filter(Boolean).join(', ')}
-                          </div>
-                          <div className="flex flex-wrap items-center gap-1.5 mt-1.5">
-                            <Chip c="bg-slate-100 dark:bg-slate-700 font-mono text-slate-700 dark:text-slate-300">ID: {m.id}</Chip>
-                            <Chip c={STAT[s] || STAT.free}>{s.toUpperCase()}{m.paymentExpiry && s === 'paid' ? ` · ${daysLeft(m.paymentExpiry)}d` : ''}</Chip>
-                            <Chip c={la ? 'bg-emerald-100 text-emerald-800 dark:bg-emerald-950/60 dark:text-emerald-300' : 'bg-rose-100 text-rose-800 dark:bg-rose-950/60 dark:text-rose-300 font-bold'}>
-                              Azan {la ? 'ON' : 'BLOCKED'}
-                            </Chip>
-                            <Chip c={te ? 'bg-emerald-100 text-emerald-800 dark:bg-emerald-950/60 dark:text-emerald-300' : 'bg-rose-100 text-rose-800 dark:bg-rose-950/60 dark:text-rose-300 font-bold'}>
-                              Edit {te ? 'ON' : 'LOCKED'}
-                            </Chip>
-                            {!hasGps(m) && <Chip c="bg-amber-100 text-amber-800 dark:bg-amber-950/60 dark:text-amber-300">No GPS</Chip>}
+                          <div className="text-xs text-slate-500 dark:text-slate-400 mt-1">
+                            <b>{s.total} Mosques</b> in DB ({s.districtsCount} Districts)
                           </div>
                         </div>
-                      </div>
 
-                      {/* Mosque Quick Control Buttons: COMPLETELY INDEPENDENT TOGGLES */}
-                      <div className="flex flex-wrap gap-1.5 lg:justify-end shrink-0">
-                        <button onClick={() => setView(m)} className={`${B} text-white shadow-xs`} style={{ background: S.accent }}>
-                          👁️ View
-                        </button>
-                        {/* 1-Click Blue Tick Toggle Button */}
-                        <button
-                          onClick={() => toggleFlag(m, 'isVerified', 'Verified Blue Tick')}
-                          className={`${B} ${isVer ? 'bg-sky-500 text-white shadow-xs font-black' : 'bg-sky-50 text-sky-800 border border-sky-300 dark:bg-sky-950/40 dark:text-sky-300'}`}
-                          title={isVer ? 'Remove Verified Blue Tick' : 'Grant Verified Blue Tick'}
-                        >
-                          {isVer ? '✓ Blue Tick' : '🔵 Blue Tick'}
-                        </button>
-                        {/* Independent Live Azan Switch (even if paid) */}
-                        <button
-                          onClick={() => toggle(m, 'liveAzanAllowed', 'Live Azan')}
-                          className={`${B} ${la ? 'bg-rose-50 text-rose-700 border border-rose-300 dark:bg-rose-950/40 dark:text-rose-300 dark:border-rose-800' : 'bg-emerald-600 text-white'}`}
-                          title={la ? 'Block Live Azan for this mosque' : 'Allow Live Azan'}
-                        >
-                          {la ? 'Block Azan' : 'Allow Azan'}
-                        </button>
-                        {/* Independent Time Edit Switch (even if paid) */}
-                        <button
-                          onClick={() => toggle(m, 'timeEditAllowed', 'Time editing')}
-                          className={`${B} ${te ? 'bg-slate-100 dark:bg-slate-700 text-slate-800 dark:text-slate-200' : 'bg-emerald-600 text-white'}`}
-                          title={te ? 'Lock Namaz Time editing' : 'Unlock Namaz Time editing'}
-                        >
-                          {te ? 'Lock Edit' : 'Unlock Edit'}
-                        </button>
-                        {/* Independent Suspension Switch */}
-                        <button
-                          onClick={() => toggleFlag(m, 'isSuspended', 'Suspension')}
-                          className={`${B} ${isSusp ? 'bg-emerald-600 text-white font-black' : 'bg-rose-100 text-rose-800 border border-rose-300 dark:bg-rose-950/40 dark:text-rose-300'}`}
-                          title={isSusp ? 'Restore Mosque to App' : 'Suspend Mosque (Hide from app)'}
-                        >
-                          {isSusp ? '✅ Restore' : '🚫 Suspend'}
-                        </button>
-                        <button onClick={() => setPlanM(m)} className={`${B} bg-amber-400 text-slate-900 font-extrabold shadow-xs`}>
-                          💳 Plan
-                        </button>
-                        <button onClick={() => setEdit(m)} className={`${B} bg-slate-100 dark:bg-slate-700 text-slate-800 dark:text-slate-200`} title="Edit Mosque">
-                          ✏️
-                        </button>
+                        <div className="flex gap-1.5 pt-1 border-t dark:border-slate-700">
+                          {s.isFullyBanned ? (
+                            <button
+                              onClick={() => handleUnbanState(s.name)}
+                              className={`${B} bg-emerald-600 hover:bg-emerald-700 text-white w-full text-center font-bold`}
+                            >
+                              ✅ Unban State
+                            </button>
+                          ) : (
+                            <button
+                              onClick={() => handleBanState(s.name)}
+                              className={`${B} bg-rose-600 hover:bg-rose-700 text-white w-full text-center font-bold`}
+                            >
+                              🚫 Ban State
+                            </button>
+                          )}
+                        </div>
+                      </div>
+                    ))}
+                </div>
+              </div>
+            </>
+          )}
+
+          {/* ============ PAGE 4: PASSWORD RESET REQUESTS & 1-CLICK WHATSAPP ============ */}
+          {page === 'resets' && (
+            <>
+              <div className="flex flex-wrap items-center justify-between gap-2">
+                <div>
+                  <h2 className="text-xl font-extrabold text-slate-900 dark:text-white">🔑 Password Reset & WhatsApp Delivery</h2>
+                  <p className="text-xs text-slate-500 dark:text-slate-400">
+                    इमामों के पासवर्ड रीसेट अनुरोध देखें और 1-क्लिक में उनके रजिस्टर्ड नंबर पर ID और पासवर्ड भेजें।
+                  </p>
+                </div>
+              </div>
+
+              {/* Instant WhatsApp Sender to ANY Mosque */}
+              <div className={`${card} p-4 sm:p-5 border-2 border-emerald-500 bg-emerald-50/30 dark:bg-emerald-950/20 space-y-3`}>
+                <div className="flex items-center gap-2">
+                  <span className="text-xl">💬</span>
+                  <h3 className="font-extrabold text-sm text-emerald-950 dark:text-emerald-200">
+                    किसी भी मस्जिद के इमाम को तुरंत WhatsApp पर ID और पासवर्ड भेजें
+                  </h3>
+                </div>
+                <div className="grid sm:grid-cols-2 gap-3 pt-1">
+                  <div>
+                    <label className="block text-xs font-bold text-slate-600 dark:text-slate-300 mb-1">मस्जिद चुनें</label>
+                    <select
+                      className={inp}
+                      onChange={e => {
+                        const sel = masjids[e.target.value];
+                        if (sel) {
+                          const msg = `अस्सलाम अलैकुम हज़रत ${sel.imamName || ''},\n\nमस्जिद कनेक्ट ऐप में आपकी मस्जिद का लॉगिन विवरण:\n🕌 मस्जिद: ${sel.name}\n🆔 मस्जिद ID: ${sel.id}\n🔑 पासवर्ड (PIN): ${sel.passcode}\n\nऐप में इस ID और पासवर्ड से लॉगिन करें।`;
+                          window.open(waLink(sel.phone, msg), '_blank');
+                        }
+                      }}
+                    >
+                      <option value="">-- मस्जिद चुनें (WhatsApp भेजने के लिए) --</option>
+                      {all.map(m => (
+                        <option key={m.id} value={m.id}>
+                          {m.name} (ID: {m.id}) - Phone: {m.phone || 'N/A'} - PIN: {m.passcode}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                  <div className="text-xs text-slate-600 dark:text-slate-300 flex items-center">
+                    💡 ड्रॉपडाउन से मस्जिद चुनते ही सीधे उस इमाम का WhatsApp खुल जाएगा और ID व पासवर्ड लिखा हुआ मैसेज तैयार रहेगा!
+                  </div>
+                </div>
+              </div>
+
+              {/* Pending Reset Requests from Firestore */}
+              <div className={`${card} p-4 space-y-3`}>
+                <div className="flex justify-between items-center border-b dark:border-slate-700 pb-2">
+                  <h3 className="font-extrabold text-sm text-slate-900 dark:text-white flex items-center gap-2">
+                    <span>🔔 पासवर्ड रीसेट अनुरोध सूची</span>
+                    <span className="text-xs bg-emerald-100 text-emerald-800 dark:bg-emerald-950 px-2 py-0.5 rounded-full font-mono">
+                      {passwordResets.length} Total
+                    </span>
+                  </h3>
+                </div>
+
+                {passwordResets.length === 0 ? (
+                  <div className="py-10 text-center text-xs text-slate-400">
+                    फिलहाल कोई पासवर्ड रीसेट अनुरोध लंबित नहीं है। जब भी कोई इमाम "पासवर्ड भूल गए" अनुरोध भेजेगा, यहाँ 1-क्लिक व्हाट्सएप बटन के साथ दिखेगा।
+                  </div>
+                ) : (
+                  <div className="space-y-3">
+                    {passwordResets.map(r => {
+                      const targetMasjid = masjids[r.masjidId] || all.find(m => m.phone === r.phone) || {};
+                      const phoneToUse = r.phone || targetMasjid.phone || '';
+                      const imamName = r.imamName || targetMasjid.imamName || 'इमाम साहिब';
+                      const masjidName = r.masjidName || targetMasjid.name || r.masjidId;
+                      const pin = r.passcode || targetMasjid.passcode || 'N/A';
+                      const msg = `अस्सलाम अलैकुम हज़रत ${imamName},\n\nमस्जिद कनेक्ट ऐप में आपकी मस्जिद का लॉगिन विवरण:\n🕌 मस्जिद: ${masjidName}\n🆔 मस्जिद ID: ${targetMasjid.id || r.masjidId}\n🔑 पासवर्ड (PIN): ${pin}\n\nऐप में इस ID और पासवर्ड से लॉगिन करें।`;
+
+                      return (
+                        <div key={r.id} className="p-4 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-700/40 flex flex-col md:flex-row md:items-center justify-between gap-3">
+                          <div className="min-w-0">
+                            <div className="flex items-center gap-2">
+                              <b className="text-sm text-slate-900 dark:text-white">{masjidName}</b>
+                              <span className="text-xs font-mono bg-slate-200 dark:bg-slate-700 px-1.5 py-0.5 rounded font-bold">ID: {targetMasjid.id || r.masjidId}</span>
+                              {r.status === 'completed' ? (
+                                <Chip c="bg-emerald-600 text-white font-bold">✓ Sent</Chip>
+                              ) : (
+                                <Chip c="bg-amber-400 text-slate-900 font-bold animate-pulse">Pending</Chip>
+                              )}
+                            </div>
+                            <div className="text-xs text-slate-600 dark:text-slate-300 mt-1">
+                              👤 <b>{imamName}</b> · 📱 <b>{phoneToUse}</b> · 🔑 पासवर्ड: <span className="font-mono font-black text-emerald-600 dark:text-emerald-400">{pin}</span>
+                            </div>
+                            <div className="text-[11px] text-slate-400 mt-0.5">
+                              समय: {r.ts ? new Date(r.ts).toLocaleString('en-GB') : 'Just now'}
+                            </div>
+                          </div>
+
+                          <div className="flex items-center gap-2 shrink-0">
+                            {phoneToUse ? (
+                              <a
+                                target="_blank"
+                                rel="noreferrer"
+                                href={waLink(phoneToUse, msg)}
+                                className={`${B} bg-[#25D366] hover:bg-[#20ba59] text-white flex items-center gap-1.5 shadow-md font-extrabold`}
+                              >
+                                <span>💬 1-Click WhatsApp भेजें</span>
+                              </a>
+                            ) : (
+                              <span className="text-xs text-rose-500 font-bold">No Phone</span>
+                            )}
+                            <button
+                              onClick={() => deletePasswordReset(r.id)}
+                              className={`${B} bg-slate-200 dark:bg-slate-600 hover:bg-rose-100 text-slate-700 dark:text-slate-200 hover:text-rose-700`}
+                              title="हटाएं (Remove)"
+                            >
+                              🗑️ हटाएँ
+                            </button>
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                )}
+              </div>
+            </>
+          )}
+
+          {/* ============ PAGE 5: COMPLAINTS & FEEDBACK (SHIKAYAT & SUJHAO) ============ */}
+          {page === 'feedback' && (
+            <>
+              <div className="flex flex-wrap items-center justify-between gap-2">
+                <div>
+                  <h2 className="text-xl font-extrabold text-slate-900 dark:text-white">💬 शिकायत एवं सुझाव (Complaints & Feedback)</h2>
+                  <p className="text-xs text-slate-500 dark:text-slate-400">
+                    यूज़र्स, मुक़्तदियों और इमामों द्वारा भेजी गई शिकायतें व सुझाव देखें और जब चाहें मिटाएं।
+                  </p>
+                </div>
+              </div>
+
+              <div className={`${card} p-4 space-y-3`}>
+                <div className="flex justify-between items-center border-b dark:border-slate-700 pb-2">
+                  <h3 className="font-extrabold text-sm text-slate-900 dark:text-white flex items-center gap-2">
+                    <span>📋 सभी प्राप्त शिकायतें व सुझाव</span>
+                    <span className="text-xs bg-rose-100 text-rose-800 dark:bg-rose-950 px-2 py-0.5 rounded-full font-mono">
+                      {feedbacks.length} Total
+                    </span>
+                  </h3>
+                </div>
+
+                {feedbacks.length === 0 ? (
+                  <div className="py-12 text-center text-xs text-slate-400 space-y-2">
+                    <p className="text-2xl">📬</p>
+                    <p className="font-bold">फिलहाल कोई नई शिकायत या सुझाव नहीं है।</p>
+                    <p className="text-[11px]">उपयोगकर्ता जब भी मुख्य ऐप से शिकायत या सुझाव दर्ज करेंगे, वह सीधे यहाँ दिखाई देगी।</p>
+                  </div>
+                ) : (
+                  <div className="space-y-3">
+                    {feedbacks.map(f => {
+                      const isResolved = f.status === 'resolved';
+                      const tagColor = f.type === 'complaint' ? 'bg-rose-600 text-white' : f.type === 'bug' ? 'bg-amber-500 text-slate-900' : 'bg-sky-600 text-white';
+                      const tagLabel = f.type === 'complaint' ? '⚠️ शिकायत' : f.type === 'bug' ? '🐛 बग / समस्या' : '💡 सुझाव';
+
+                      return (
+                        <div key={f.id} className={`p-4 rounded-xl border ${isResolved ? 'bg-slate-50 dark:bg-slate-800/40 border-slate-200 dark:border-slate-700 opacity-75' : 'bg-white dark:bg-slate-700/60 border-amber-300 dark:border-amber-700 shadow-xs'} space-y-2.5`}>
+                          <div className="flex flex-wrap items-center justify-between gap-2">
+                            <div className="flex items-center gap-2">
+                              <Chip c={`${tagColor} font-bold`}>{tagLabel}</Chip>
+                              <b className="text-sm text-slate-900 dark:text-white">{f.userName || 'Anonymous User'}</b>
+                              {f.masjidName && <span className="text-xs text-slate-500">· 🕌 {f.masjidName}</span>}
+                              {isResolved && <Chip c="bg-emerald-600 text-white font-bold">✓ Resolved</Chip>}
+                            </div>
+                            <span className="text-xs font-mono text-slate-400">
+                              {f.ts ? new Date(f.ts).toLocaleString('en-GB') : (f.date || '')}
+                            </span>
+                          </div>
+
+                          <p className="text-xs sm:text-sm text-slate-800 dark:text-slate-200 whitespace-pre-wrap leading-relaxed bg-slate-100 dark:bg-slate-800 p-3 rounded-lg border border-slate-200 dark:border-slate-700">
+                            {f.message || f.body || f.text || ''}
+                          </p>
+
+                          <div className="flex flex-wrap items-center justify-between gap-2 pt-1 border-t dark:border-slate-700/60 text-xs">
+                            <div className="text-slate-500 dark:text-slate-400">
+                              {f.phone && <span>📱 फ़ोन / व्हाट्सएप: <b className="font-mono text-slate-900 dark:text-white">{f.phone}</b></span>}
+                              {f.email && <span className="ml-2">📧 {f.email}</span>}
+                            </div>
+
+                            <div className="flex items-center gap-1.5 ml-auto">
+                              {f.phone && (
+                                <a
+                                  target="_blank"
+                                  rel="noreferrer"
+                                  href={waLink(f.phone, `अस्सलाम अलैकुम ${f.userName || ''}, मस्जिद कनेक्ट टीम की ओर से आपके संदेश के संबंध में:`)}
+                                  className={`${B} bg-[#25D366] text-white flex items-center gap-1 font-bold`}
+                                >
+                                  💬 व्हाट्सएप पर जवाब दें
+                                </a>
+                              )}
+                              <button
+                                onClick={() => toggleFeedbackResolved(f.id, f.status)}
+                                className={`${B} ${isResolved ? 'bg-slate-200 dark:bg-slate-700 text-slate-700 dark:text-slate-200' : 'bg-emerald-600 text-white font-bold'}`}
+                              >
+                                {isResolved ? 'मार्क अनसुलझा (Undo)' : '✓ हल हुआ (Resolved)'}
+                              </button>
+                              {/* Permament Delete Button */}
+                              <button
+                                onClick={() => deleteFeedback(f.id)}
+                                className={`${B} bg-rose-50 text-rose-700 border border-rose-300 dark:bg-rose-950/40 dark:text-rose-300 font-bold hover:bg-rose-600 hover:text-white`}
+                                title="शिकायत हमेशा के लिए मिटाएं"
+                              >
+                                🗑️ मिटाएँ
+                              </button>
+                            </div>
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                )}
+              </div>
+            </>
+          )}
+
+          {/* ============ PAGE 6: PLANS, PAYMENTS & AUDIT LOGS ============ */}
+          {page === 'plans' && (
+            <>
+              <div className="flex flex-wrap items-center justify-between gap-2">
+                <div>
+                  <h2 className="text-xl font-extrabold text-slate-900 dark:text-white">Plans, Payments & Subscriptions</h2>
+                  <p className="text-xs text-slate-500 dark:text-slate-400">
+                    मासिक ₹{S.monthlyFee} · वार्षिक ₹{S.yearlyFee} — राशि के आधार पर स्वतः महीनों की गणना
+                  </p>
+                </div>
+                <button onClick={() => setBulkPricingModal(true)} className={`${B} bg-amber-400 text-slate-900 font-black shadow-xs flex items-center gap-1`}>
+                  <span>⚡ Special / Ramadan Pricing Controller</span>
+                </button>
+              </div>
+
+              {/* Quick Stats Grid */}
+              <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
+                {[
+                  ['Paid Mosques', st.paid],
+                  ['Active Subscriptions Rev', '₹' + st.activePaidRev],
+                  ['Total Verified Revenue', '₹' + st.revAll],
+                  ['Revenue This Month', '₹' + st.revMo]
+                ].map(([t, v]) => (
+                  <div key={t} className={`${card} p-4`}>
+                    <div className="text-[11px] font-bold text-slate-500 uppercase">{t}</div>
+                    <div className="text-2xl font-black mt-1" style={{ color: S.accent }}>{v}</div>
+                  </div>
+                ))}
+              </div>
+
+              {/* Pending UTR Queue */}
+              {reqs.length > 0 && (
+                <div className="p-4 rounded-2xl bg-amber-50 dark:bg-amber-900/20 border-2 border-amber-400 space-y-2">
+                  <h3 className="font-extrabold text-sm text-slate-900 dark:text-amber-200">🔔 Pending Payment Verification Requests ({reqs.length})</h3>
+                  {reqs.map(r => (
+                    <div key={r.id} className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 py-2 border-t border-amber-200 dark:border-amber-800 text-xs">
+                      <div>
+                        <b className="text-slate-900 dark:text-white">{r.masjidName || r.masjidId}</b>
+                        <span className="font-mono ml-2 font-bold bg-amber-200 dark:bg-amber-950 px-1.5 py-0.5 rounded">UTR: {r.utr || 'N/A'}</span>
+                        <span className="text-slate-500 ml-2">₹{r.amount || '-'} {r.plan ? `(${r.plan})` : ''}</span>
+                      </div>
+                      <div className="flex flex-wrap gap-1.5">
+                        <button onClick={() => approveReq(r, 'monthly')} className={`${B} bg-emerald-600 text-white`}>✅ Approve Plan</button>
+                        <button onClick={() => rejectReq(r)} className={`${B} bg-rose-50 text-rose-700 border border-rose-300 dark:bg-rose-950/40 dark:text-rose-300`}>Reject</button>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+
+              {/* Bulk Network Actions */}
+              <div className={`${card} p-4 space-y-2`}>
+                <h3 className="font-extrabold text-sm text-slate-900 dark:text-white">⚡ Global Network Bulk Actions</h3>
+                <p className="text-[11px] text-slate-500 dark:text-slate-400">Applies across all {st.total} mosques.</p>
+                <div className="flex flex-wrap gap-2 pt-1">
+                  <button
+                    className={`${B} bg-emerald-600 text-white`}
+                    onClick={() => setConfirm({
+                      t: 'Make ALL Mosques 100% Free?',
+                      d: 'All mosques across India will receive free full access (Live Azan + Time Edit ON) with no payment requirement.',
+                      go: () => batchPatch(all, () => ({ paymentPlan: 'free', paymentStatus: 'free', paymentAmount: 0, paymentExpiry: null, liveAzanAllowed: true, timeEditAllowed: true })).then(() => say('All mosques are now free'))
+                    })}
+                  >
+                    🎁 Make ALL Mosques Free
+                  </button>
+                  <button
+                    className={`${B} bg-rose-600 text-white`}
+                    onClick={() => setConfirm({
+                      t: 'Lock ALL Unpaid Mosques?',
+                      d: 'Free and expired mosques will lose Live Azan and Time Editing until payment is made. Currently paid mosques will not be touched.',
+                      go: () => batchPatch(all.filter(m => eff(m) !== 'paid'), () => ({ paymentStatus: 'expired', liveAzanAllowed: false, timeEditAllowed: false })).then(() => say('Unpaid mosques locked'))
+                    })}
+                  >
+                    🔒 Lock ALL Unpaid Mosques
+                  </button>
+                  <button className={`${B} bg-slate-200 dark:bg-slate-700 text-slate-800 dark:text-slate-200`} onClick={() => exportCsv(all.filter(m => eff(m) !== 'free'))}>
+                    📥 Export Subscriptions CSV
+                  </button>
+                </div>
+              </div>
+
+              {/* Payment Audit Logs (WITH VOID / DELETE BUTTON TO DIRECTLY REDUCE REVENUE) */}
+              <div className={`${card} p-4`}>
+                <div className="flex items-center justify-between mb-2">
+                  <h3 className="font-extrabold text-sm text-slate-900 dark:text-white">Recent Payment Audit Log</h3>
+                  <span className="text-xs text-slate-400">गलती से हुए भुगतान को मिटाने पर कुल रेवेन्यू तुरंत कम हो जाएगा</span>
+                </div>
+                {logs.length === 0 ? (
+                  <p className="text-xs text-slate-400 py-4">No payments recorded yet.</p>
+                ) : (
+                  <div className="overflow-x-auto thin">
+                    <table className="w-full text-xs">
+                      <thead>
+                        <tr className="text-left text-slate-500 border-b dark:border-slate-700">
+                          <th className="py-2">Date</th>
+                          <th>Mosque</th>
+                          <th>Plan</th>
+                          <th>Amount</th>
+                          <th>Note</th>
+                          <th className="text-right">Action (Void)</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {logs.slice(0, 25).map(l => (
+                          <tr key={l.id} className="border-t dark:border-slate-700/60">
+                            <td className="py-2 font-mono text-slate-500">{l.date}</td>
+                            <td className="font-bold text-slate-900 dark:text-white">{l.masjidName}</td>
+                            <td className="capitalize">{l.plan}</td>
+                            <td><b className="text-emerald-600 dark:text-emerald-400">₹{l.amount}</b></td>
+                            <td className="text-slate-500 truncate max-w-xs">{l.note}</td>
+                            <td className="text-right py-1">
+                              <button
+                                onClick={() => deletePaymentLog(l.id, l.amount, l.masjidName)}
+                                className="px-2 py-1 rounded bg-rose-50 text-rose-700 border border-rose-300 dark:bg-rose-950/40 dark:text-rose-300 text-[10px] font-bold hover:bg-rose-600 hover:text-white transition"
+                                title="भुगतान रद्द करें व रेवेन्यू कम करें"
+                              >
+                                🗑️ रद्द करें (Void)
+                              </button>
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                )}
+              </div>
+
+              {/* Subscriptions List */}
+              <div className={`${card} p-4 space-y-2`}>
+                <h3 className="font-extrabold text-sm text-slate-900 dark:text-white">All Mosque Subscriptions</h3>
+                {[...all].sort((a, b) => (a.paymentExpiry || 'z').localeCompare(b.paymentExpiry || 'z')).map(m => {
+                  const s = eff(m);
+                  return (
+                    <div key={m.id} className="flex flex-wrap items-center justify-between gap-2 py-2 border-t dark:border-slate-700 text-xs">
+                      <div className="min-w-0">
+                        <b className="text-slate-900 dark:text-white">{m.name}</b>
+                        <Chip c={STAT[s]}>{s.toUpperCase()}</Chip>
+                        <span className="text-slate-500 dark:text-slate-400 capitalize ml-1.5">
+                          {m.paymentPlan || 'free'}{m.paymentExpiry ? ` · Valid till ${m.paymentExpiry} (${daysLeft(m.paymentExpiry)}d)` : ''}
+                        </span>
+                      </div>
+                      <div className="flex gap-1.5">
+                        <button onClick={() => activateWithAmount(m, S.monthlyFee || 10, S.monthlyFee || 10)} className={`${B} bg-emerald-600 text-white`}>+1 Month</button>
+                        <button onClick={() => activateWithAmount(m, S.yearlyFee || 99, S.monthlyFee || 10)} className={`${B} bg-emerald-800 text-white`}>+1 Year</button>
+                        <button onClick={() => setPlanM(m)} className={`${B} bg-slate-100 dark:bg-slate-700 text-slate-800 dark:text-slate-200`}>Edit</button>
                       </div>
                     </div>
                   );
                 })}
               </div>
-            )}
-          </>
-        )}
+            </>
+          )}
 
-        {/* ============ PAGE 3: SMART STATE & DISTRICT BAN CONTROLLER ============ */}
-        {page === 'regions' && (
-          <>
-            <div className="flex flex-wrap items-center justify-between gap-2">
+          {/* ============ PAGE 7: BROADCAST ============ */}
+          {page === 'broadcast' && (
+            <>
               <div>
-                <h2 className="text-xl font-extrabold text-slate-900 dark:text-white">State & District Ban Controller</h2>
-                <p className="text-xs text-slate-500 dark:text-slate-400">
-                  Desh ke kisi bhi State ya District ko 1 click me ban karein ya pehle se pre-ban karein taaki waha ke imam aur muqtadi app na chala sakein.
-                </p>
+                <h2 className="text-xl font-extrabold text-slate-900 dark:text-white">Push Broadcast to All Users</h2>
+                <p className="text-xs text-slate-500 dark:text-slate-400">Send an instant alert notice to all connected users and mosques</p>
               </div>
-              <input
-                className={`${inp} max-w-xs`}
-                placeholder="🔍 Search state or district…"
-                value={regionFilter}
-                onChange={e => setRegionFilter(e.target.value)}
-              />
-            </div>
-
-            {/* PRE-BAN QUICK ACTION CARD */}
-            <div className={`${card} p-4 sm:p-5 border-2 border-rose-400/80 bg-rose-50/40 dark:bg-rose-950/20 space-y-3`}>
-              <div className="flex items-center gap-2">
-                <span className="text-lg">🚫</span>
-                <h3 className="font-black text-sm text-rose-900 dark:text-rose-200 uppercase tracking-wide">
-                  Pre-Ban / Instant Ban Any Region in India
-                </h3>
-              </div>
-              <p className="text-xs text-slate-600 dark:text-slate-300">
-                Aap chahein to pehle se hi <b>Mau, Ballia, Azamgarh</b> ya kisi bhi District ya State ko Ban list me daal sakte hain. Wahan ke sabhi users ka app turant block ho jayega.
-              </p>
-
-              <form onSubmit={handleAddCustomPreBan} className="grid sm:grid-cols-3 gap-2.5 pt-1">
-                <select className={inp} value={customBanType} onChange={e => setCustomBanType(e.target.value)}>
-                  <option value="district">🏙️ District / City Ban</option>
-                  <option value="state">🏛️ State-Wide Ban</option>
-                </select>
-
-                <div className="relative">
-                  <input
-                    className={inp}
-                    placeholder={customBanType === 'state' ? "e.g. Uttar Pradesh, Bihar, Delhi" : "e.g. Mau, Ballia, Azamgarh, Patna"}
-                    value={customBanInput}
-                    onChange={e => setCustomBanInput(e.target.value)}
-                    list="region-presets"
-                    required
-                  />
-                  <datalist id="region-presets">
-                    {customBanType === 'state' ? (
-                      ALL_INDIA_STATES.map(s => <option key={s} value={s} />)
-                    ) : (
-                      POPULAR_DISTRICTS.map(d => <option key={d} value={d} />)
-                    )}
-                  </datalist>
+              <form onSubmit={sendAnn} className={`${card} p-4 sm:p-5 space-y-3`}>
+                <div>
+                  <label className="block text-xs font-bold text-slate-600 dark:text-slate-300 mb-1">Broadcast Title</label>
+                  <input className={inp} placeholder="e.g. Ramadan Mubarak / Server Maintenance Notice" value={nt} onChange={e => setNt(e.target.value)} required />
                 </div>
-
-                <button type="submit" className={`${B} bg-rose-600 hover:bg-rose-700 text-white font-black shadow-md flex items-center justify-center gap-1.5`}>
-                  <span>🚫 Ban This Region Now</span>
+                <div>
+                  <label className="block text-xs font-bold text-slate-600 dark:text-slate-300 mb-1">Message Content</label>
+                  <textarea rows="4" className={inp} placeholder="Write announcement details..." value={nb} onChange={e => setNb(e.target.value)} required />
+                </div>
+                <button className={`${B} text-white py-3 w-full shadow-md`} style={{ background: S.accent }}>
+                  📡 Send Broadcast Live
                 </button>
               </form>
-            </div>
 
-            {/* ACTIVE BLACKLIST (BANNED REGIONS CHIPS) */}
-            {((S.bannedStates && S.bannedStates.length > 0) || (S.bannedDistricts && S.bannedDistricts.length > 0)) && (
-              <div className={`${card} p-4 space-y-2 border-2 border-rose-500`}>
-                <div className="flex items-center justify-between">
-                  <h4 className="font-extrabold text-sm text-rose-700 dark:text-rose-300 flex items-center gap-2">
-                    <span>⛔ Currently Active Banned Regions (Blacklist)</span>
-                    <span className="text-[10px] bg-rose-600 text-white px-2 py-0.5 rounded-full font-mono">
-                      {(S.bannedStates?.length || 0) + (S.bannedDistricts?.length || 0)} Banned
-                    </span>
-                  </h4>
-                </div>
-
-                <div className="flex flex-wrap gap-2 pt-1">
-                  {(S.bannedStates || []).map(s => {
-                    const matchCount = all.filter(m => isMosqueInState(m, s)).length;
-                    return (
-                      <span key={s} className="inline-flex items-center gap-1.5 px-3 py-1 rounded-xl bg-rose-100 text-rose-900 dark:bg-rose-900/60 dark:text-rose-100 text-xs font-bold border border-rose-300 dark:border-rose-700 shadow-xs">
-                        <span>🏛️ State: <b>{s}</b> ({matchCount} Mosques)</span>
-                        <button type="button" onClick={() => handleUnbanState(s)} className="w-4 h-4 rounded-full bg-rose-300 dark:bg-rose-800 hover:bg-rose-400 flex items-center justify-center text-[10px] ml-1 font-black" title="Unban State">✕</button>
-                      </span>
-                    );
-                  })}
-                  {(S.bannedDistricts || []).map(d => {
-                    const matchCount = all.filter(m => isMosqueInDistrict(m, d)).length;
-                    return (
-                      <span key={d} className="inline-flex items-center gap-1.5 px-3 py-1 rounded-xl bg-rose-100 text-rose-900 dark:bg-rose-900/60 dark:text-rose-100 text-xs font-bold border border-rose-300 dark:border-rose-700 shadow-xs">
-                        <span>🏙️ District: <b>{d}</b> ({matchCount} Mosques)</span>
-                        <button type="button" onClick={() => handleUnbanDistrict(d)} className="w-4 h-4 rounded-full bg-rose-300 dark:bg-rose-800 hover:bg-rose-400 flex items-center justify-center text-[10px] ml-1 font-black" title="Unban District">✕</button>
-                      </span>
-                    );
-                  })}
-                </div>
-              </div>
-            )}
-
-            {/* Region Stats Summary */}
-            <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
-              <div className={`${card} p-4`}>
-                <div className="text-[11px] font-bold text-slate-500 uppercase">Total States</div>
-                <div className="text-2xl font-black text-slate-900 dark:text-white mt-1">{regionData.statesList.length}</div>
-                <div className="text-[11px] text-slate-400">Coverage across network</div>
-              </div>
-              <div className={`${card} p-4`}>
-                <div className="text-[11px] font-bold text-slate-500 uppercase">Total Districts</div>
-                <div className="text-2xl font-black text-slate-900 dark:text-white mt-1">{regionData.districtsList.length}</div>
-                <div className="text-[11px] text-slate-400">Registered locations</div>
-              </div>
-              <div className={`${card} p-4`}>
-                <div className="text-[11px] font-bold text-slate-500 uppercase">Suspended Mosques</div>
-                <div className="text-2xl font-black text-rose-600 mt-1">{st.susp}</div>
-                <div className="text-[11px] text-slate-400">Currently locked/hidden</div>
-              </div>
-              <div className={`${card} p-4`}>
-                <div className="text-[11px] font-bold text-slate-500 uppercase">Active Mosques</div>
-                <div className="text-2xl font-black text-emerald-600 mt-1">{st.active}</div>
-                <div className="text-[11px] text-slate-400">Visible on main app</div>
-              </div>
-            </div>
-
-            {/* SECTION A: STATE-WISE 1-CLICK BAN */}
-            <div className={`${card} p-4 sm:p-5 space-y-4`}>
-              <div className="flex items-center justify-between border-b dark:border-slate-700 pb-3">
-                <div>
-                  <h3 className="font-extrabold text-base text-slate-900 dark:text-white flex items-center gap-2">
-                    <span>🏛️ State-Wise Ban Controls</span>
-                    <span className="text-xs bg-slate-100 dark:bg-slate-700 px-2 py-0.5 rounded-full font-mono">{regionData.statesList.length} States</span>
-                  </h3>
-                  <p className="text-xs text-slate-500 dark:text-slate-400">Poora State ek click me band ya chalu karein (UP, Bihar, Delhi etc.).</p>
-                </div>
-              </div>
-
-              <div className="space-y-2.5">
-                {regionData.statesList
-                  .filter(s => !regionFilter || s.name.toLowerCase().includes(regionFilter.toLowerCase()))
-                  .map(s => (
-                    <div key={s.name} className={`p-3 sm:p-4 rounded-xl border flex flex-col sm:flex-row sm:items-center justify-between gap-3 ${s.isFullyBanned ? 'bg-rose-50/80 dark:bg-rose-950/30 border-rose-300 dark:border-rose-900' : s.isPartiallyBanned ? 'bg-amber-50/80 dark:bg-amber-950/20 border-amber-300 dark:border-amber-900' : 'bg-slate-50 dark:bg-slate-700/40 border-slate-200 dark:border-slate-700'}`}>
-                      <div className="min-w-0">
-                        <div className="flex items-center gap-2 flex-wrap">
-                          <h4 className="font-black text-sm sm:text-base text-slate-900 dark:text-white">{s.name}</h4>
-                          {s.isFullyBanned && <Chip c="bg-rose-600 text-white font-black animate-pulse">🚫 FULLY BANNED</Chip>}
-                          {s.isPartiallyBanned && <Chip c="bg-amber-500 text-slate-900 font-bold">⚠️ PARTIALLY BANNED</Chip>}
-                          {!s.isFullyBanned && !s.isPartiallyBanned && <Chip c="bg-emerald-600 text-white font-bold">✅ ALL ACTIVE</Chip>}
-                        </div>
-                        <div className="text-xs text-slate-500 dark:text-slate-400 mt-1">
-                          <b>{s.total} Mosques</b> in {s.districtsCount} Districts · <span className="text-emerald-600 dark:text-emerald-400 font-bold">{s.active} Active</span> · <span className="text-rose-600 dark:text-rose-400 font-bold">{s.suspended} Suspended</span>
-                        </div>
+              <div className={`${card} p-4 space-y-2`}>
+                <h3 className="font-extrabold text-sm text-slate-900 dark:text-white">Broadcast History</h3>
+                {anns.length === 0 ? (
+                  <p className="text-xs text-slate-400 py-3">No announcements sent yet</p>
+                ) : (
+                  anns.map(a => (
+                    <div key={a.id} className="p-3 rounded-xl bg-slate-50 dark:bg-slate-700/50 text-xs">
+                      <div className="flex justify-between font-bold">
+                        <b className="text-slate-900 dark:text-white">{a.title}</b>
+                        <span className="text-slate-400 font-mono">{a.date}</span>
                       </div>
-
-                      {/* 1-Click Action Buttons for State */}
-                      <div className="flex items-center gap-2 shrink-0">
-                        {s.isFullyBanned ? (
-                          <button
-                            onClick={() => handleUnbanState(s.name)}
-                            className={`${B} bg-emerald-600 hover:bg-emerald-700 text-white shadow-xs font-black flex items-center gap-1.5`}
-                          >
-                            <span>✅ Unban Entire State</span>
-                          </button>
-                        ) : (
-                          <button
-                            onClick={() => handleBanState(s.name)}
-                            className={`${B} bg-rose-600 hover:bg-rose-700 text-white shadow-xs font-black flex items-center gap-1.5`}
-                          >
-                            <span>🚫 1-Click Ban State ({s.total})</span>
-                          </button>
-                        )}
-                        {s.isPartiallyBanned && (
-                          <button
-                            onClick={() => handleUnbanState(s.name)}
-                            className={`${B} bg-emerald-600 text-white font-bold`}
-                          >
-                            ✅ Restore All
-                          </button>
-                        )}
-                      </div>
+                      <p className="mt-1 whitespace-pre-wrap text-slate-700 dark:text-slate-300">{a.body}</p>
                     </div>
-                  ))}
+                  ))
+                )}
               </div>
-            </div>
+            </>
+          )}
 
-            {/* SECTION B: DISTRICT-WISE 1-CLICK BAN */}
-            <div className={`${card} p-4 sm:p-5 space-y-4`}>
-              <div className="flex items-center justify-between border-b dark:border-slate-700 pb-3">
-                <div>
-                  <h3 className="font-extrabold text-base text-slate-900 dark:text-white flex items-center gap-2">
-                    <span>🏙️ District & City-Wise Ban Controls</span>
-                    <span className="text-xs bg-slate-100 dark:bg-slate-700 px-2 py-0.5 rounded-full font-mono">{regionData.districtsList.length} Districts</span>
-                  </h3>
-                  <p className="text-xs text-slate-500 dark:text-slate-400">Kisi khas shahar ya zile (Mau, Ballia, Azamgarh, Patna aadi) ko 1 click me ban karein.</p>
-                </div>
-              </div>
-
-              <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-3">
-                {regionData.districtsList
-                  .filter(d => !regionFilter || d.name.toLowerCase().includes(regionFilter.toLowerCase()) || d.stateName.toLowerCase().includes(regionFilter.toLowerCase()))
-                  .map(d => (
-                    <div key={`${d.name}_${d.stateName}`} className={`p-3.5 rounded-xl border flex flex-col justify-between gap-2.5 ${d.isFullyBanned ? 'bg-rose-50/80 dark:bg-rose-950/30 border-rose-300 dark:border-rose-900' : d.isPartiallyBanned ? 'bg-amber-50/80 dark:bg-amber-950/20 border-amber-300 dark:border-amber-900' : 'bg-slate-50 dark:bg-slate-700/40 border-slate-200 dark:border-slate-700'}`}>
-                      <div>
-                        <div className="flex justify-between items-start gap-1">
-                          <b className="text-sm font-black text-slate-900 dark:text-white truncate">{d.name}</b>
-                          {d.isFullyBanned ? (
-                            <Chip c="bg-rose-600 text-white font-black">BANNED</Chip>
-                          ) : d.isPartiallyBanned ? (
-                            <Chip c="bg-amber-500 text-slate-900 font-bold">PARTIAL</Chip>
-                          ) : (
-                            <Chip c="bg-emerald-600 text-white">ACTIVE</Chip>
-                          )}
-                        </div>
-                        <div className="text-[11.5px] text-slate-500 dark:text-slate-400 font-semibold mt-0.5">
-                          📍 {d.stateName}
-                        </div>
-                        <div className="text-[11px] text-slate-400 mt-1">
-                          {d.total} Mosques ({d.active} active · {d.suspended} suspended)
-                        </div>
-                      </div>
-
-                      <div className="flex gap-1.5 pt-1 border-t dark:border-slate-700">
-                        {d.isFullyBanned ? (
-                          <button
-                            onClick={() => handleUnbanDistrict(d.name)}
-                            className={`${B} bg-emerald-600 hover:bg-emerald-700 text-white w-full text-center font-bold`}
-                          >
-                            ✅ Unban District
-                          </button>
-                        ) : (
-                          <button
-                            onClick={() => handleBanDistrict(d.name, d.stateName)}
-                            className={`${B} bg-rose-600 hover:bg-rose-700 text-white w-full text-center font-bold`}
-                          >
-                            🚫 Ban District ({d.total})
-                          </button>
-                        )}
-                      </div>
-                    </div>
-                  ))}
-              </div>
-            </div>
-          </>
-        )}
-
-        {/* ============ PAGE 4: PLANS & PAYMENTS ============ */}
-        {page === 'plans' && (
-          <>
-            <div className="flex flex-wrap items-center justify-between gap-2">
+          {/* ============ PAGE 8: SETTINGS ============ */}
+          {page === 'settings' && (
+            <>
               <div>
-                <h2 className="text-xl font-extrabold text-slate-900 dark:text-white">Plans, Payments & Subscriptions</h2>
-                <p className="text-xs text-slate-500 dark:text-slate-400">Monthly ₹{S.monthlyFee} · Yearly ₹{S.yearlyFee} — access ends automatically on the expiry date</p>
+                <h2 className="text-xl font-extrabold text-slate-900 dark:text-white">Admin & System Settings</h2>
+                <p className="text-xs text-slate-500 dark:text-slate-400">Brand identity, UPI IDs, subscription fees, and admin security</p>
               </div>
-              <button onClick={() => setBulkPricingModal(true)} className={`${B} bg-amber-400 text-slate-900 font-black shadow-xs flex items-center gap-1`}>
-                <span>⚡ Seasonal / Ramadan Pricing Controller</span>
-              </button>
-            </div>
-
-            {/* Quick Stats Grid */}
-            <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
-              {[
-                ['Paid Mosques', st.paid],
-                ['Free Mosques', st.free],
-                ['Expired (Locked)', st.exp],
-                ['Revenue (Month)', '₹' + st.revMo]
-              ].map(([t, v]) => (
-                <div key={t} className={`${card} p-4`}>
-                  <div className="text-[11px] font-bold text-slate-500 uppercase">{t}</div>
-                  <div className="text-2xl font-black mt-1" style={{ color: S.accent }}>{v}</div>
-                </div>
-              ))}
-            </div>
-
-            {/* Pending UTR Queue */}
-            {reqs.length > 0 && (
-              <div className="p-4 rounded-2xl bg-amber-50 dark:bg-amber-900/20 border-2 border-amber-400 space-y-2">
-                <h3 className="font-extrabold text-sm text-slate-900 dark:text-amber-200">🔔 Pending Payment Verification Requests ({reqs.length})</h3>
-                {reqs.map(r => (
-                  <div key={r.id} className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 py-2 border-t border-amber-200 dark:border-amber-800 text-xs">
-                    <div>
-                      <b className="text-slate-900 dark:text-white">{r.masjidName || r.masjidId}</b>
-                      <span className="font-mono ml-2 font-bold bg-amber-200 dark:bg-amber-950 px-1.5 py-0.5 rounded">UTR: {r.utr || 'N/A'}</span>
-                      <span className="text-slate-500 ml-2">₹{r.amount || '-'} {r.plan ? `(${r.plan})` : ''}</span>
+              <form onSubmit={saveSettings} className="space-y-4">
+                <div className={`${card} p-4 space-y-3`}>
+                  <h3 className="font-extrabold text-sm text-slate-900 dark:text-white">🎨 Brand Identity & Theme</h3>
+                  <div className="flex items-center gap-4">
+                    <div className="w-20 h-20 rounded-2xl flex items-center justify-center overflow-hidden shadow-sm" style={{ background: draft.accent }}>
+                      {draft.logo ? <img src={draft.logo} alt="" className="w-full h-full object-cover" /> : <span className="text-3xl">🕌</span>}
                     </div>
-                    <div className="flex flex-wrap gap-1.5">
-                      <button onClick={() => approveReq(r, 'monthly')} className={`${B} bg-emerald-600 text-white`}>✅ Approve 1 Month</button>
-                      <button onClick={() => approveReq(r, 'yearly')} className={`${B} bg-emerald-800 text-white`}>✅ Approve 1 Year</button>
-                      <button onClick={() => rejectReq(r)} className={`${B} bg-rose-50 text-rose-700 border border-rose-300 dark:bg-rose-950/40 dark:text-rose-300`}>Reject</button>
+                    <div className="space-x-2">
+                      <input id="logoIn" type="file" accept="image/*" className="hidden" onChange={e => e.target.files[0] && compress(e.target.files[0], 160, 0.85).then(u => setDraft(d => ({ ...d, logo: u }))).catch(() => say('Image error', 'err'))} />
+                      <label htmlFor="logoIn" className={`${B} bg-slate-100 dark:bg-slate-700 cursor-pointer inline-block`}>📸 Upload Logo</label>
+                      {draft.logo && <button type="button" onClick={() => setDraft(d => ({ ...d, logo: '' }))} className={`${B} bg-rose-50 text-rose-700`}>Remove</button>}
                     </div>
                   </div>
-                ))}
-              </div>
-            )}
-
-            {/* Bulk Network Actions */}
-            <div className={`${card} p-4 space-y-2`}>
-              <h3 className="font-extrabold text-sm text-slate-900 dark:text-white">⚡ Global Network Bulk Actions</h3>
-              <p className="text-[11px] text-slate-500 dark:text-slate-400">Applies across all {st.total} mosques. You will be asked to confirm before applying.</p>
-              <div className="flex flex-wrap gap-2 pt-1">
-                <button
-                  className={`${B} bg-emerald-600 text-white`}
-                  onClick={() => setConfirm({
-                    t: 'Make ALL Mosques 100% Free?',
-                    d: 'All mosques across India will receive free full access (Live Azan + Time Edit ON) with no payment requirement.',
-                    go: () => batchPatch(all, () => ({ paymentPlan: 'free', paymentStatus: 'free', paymentAmount: 0, paymentExpiry: null, liveAzanAllowed: true, timeEditAllowed: true })).then(() => say('All mosques are now free'))
-                  })}
-                >
-                  🎁 Make ALL Mosques Free
-                </button>
-                <button
-                  className={`${B} bg-rose-600 text-white`}
-                  onClick={() => setConfirm({
-                    t: 'Lock ALL Unpaid Mosques?',
-                    d: 'Free and expired mosques will lose Live Azan and Time Editing until payment is made. Currently paid mosques will not be touched.',
-                    go: () => batchPatch(all.filter(m => eff(m) !== 'paid'), () => ({ paymentStatus: 'expired', liveAzanAllowed: false, timeEditAllowed: false })).then(() => say('Unpaid mosques locked'))
-                  })}
-                >
-                  🔒 Lock ALL Unpaid Mosques
-                </button>
-                <button className={`${B} bg-slate-200 dark:bg-slate-700 text-slate-800 dark:text-slate-200`} onClick={() => exportCsv(all.filter(m => eff(m) !== 'free'))}>
-                  📥 Export Subscriptions CSV
-                </button>
-              </div>
-            </div>
-
-            {/* Payment Audit Logs */}
-            <div className={`${card} p-4`}>
-              <h3 className="font-extrabold text-sm mb-2 text-slate-900 dark:text-white">Recent Payment Audit Log</h3>
-              {logs.length === 0 ? (
-                <p className="text-xs text-slate-400 py-4">No payments recorded yet. Activating plans will automatically log entries here.</p>
-              ) : (
-                <div className="overflow-x-auto thin">
-                  <table className="w-full text-xs">
-                    <thead>
-                      <tr className="text-left text-slate-500 border-b dark:border-slate-700">
-                        <th className="py-2">Date</th>
-                        <th>Mosque</th>
-                        <th>Plan</th>
-                        <th>Amount</th>
-                        <th>Note</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {logs.slice(0, 15).map(l => (
-                        <tr key={l.id} className="border-t dark:border-slate-700/60">
-                          <td className="py-2 font-mono text-slate-500">{l.date}</td>
-                          <td className="font-bold text-slate-900 dark:text-white">{l.masjidName}</td>
-                          <td className="capitalize">{l.plan}</td>
-                          <td><b className="text-emerald-600 dark:text-emerald-400">₹{l.amount}</b></td>
-                          <td className="text-slate-500 truncate max-w-xs">{l.note}</td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
-              )}
-            </div>
-
-            {/* Subscriptions List */}
-            <div className={`${card} p-4 space-y-2`}>
-              <h3 className="font-extrabold text-sm text-slate-900 dark:text-white">All Mosque Subscriptions</h3>
-              {[...all].sort((a, b) => (a.paymentExpiry || 'z').localeCompare(b.paymentExpiry || 'z')).map(m => {
-                const s = eff(m);
-                return (
-                  <div key={m.id} className="flex flex-wrap items-center justify-between gap-2 py-2 border-t dark:border-slate-700 text-xs">
-                    <div className="min-w-0">
-                      <b className="text-slate-900 dark:text-white">{m.name}</b>
-                      <Chip c={STAT[s]}>{s.toUpperCase()}</Chip>
-                      <span className="text-slate-500 dark:text-slate-400 capitalize ml-1.5">
-                        {m.paymentPlan || 'free'}{m.paymentExpiry ? ` · Valid till ${m.paymentExpiry} (${daysLeft(m.paymentExpiry)}d)` : ''}
-                      </span>
-                    </div>
-                    <div className="flex gap-1.5">
-                      <button onClick={() => activate(m, 'monthly')} className={`${B} bg-emerald-600 text-white`}>+1 Month</button>
-                      <button onClick={() => activate(m, 'yearly')} className={`${B} bg-emerald-800 text-white`}>+1 Year</button>
-                      <button onClick={() => setPlanM(m)} className={`${B} bg-slate-100 dark:bg-slate-700 text-slate-800 dark:text-slate-200`}>Edit</button>
-                    </div>
+                  <div className="grid sm:grid-cols-2 gap-3">
+                    <label className="text-xs font-bold block">Panel Name<input className={inp} value={draft.brand} onChange={e => setDraft({ ...draft, brand: e.target.value })} /></label>
+                    <label className="text-xs font-bold block">Tagline<input className={inp} value={draft.tagline} onChange={e => setDraft({ ...draft, tagline: e.target.value })} /></label>
                   </div>
-                );
-              })}
-            </div>
-          </>
-        )}
-
-        {/* ============ PAGE 5: BROADCAST ============ */}
-        {page === 'broadcast' && (
-          <>
-            <div>
-              <h2 className="text-xl font-extrabold text-slate-900 dark:text-white">Push Broadcast to All Users</h2>
-              <p className="text-xs text-slate-500 dark:text-slate-400">Send an instant alert notice to all connected users and mosques</p>
-            </div>
-            <form onSubmit={sendAnn} className={`${card} p-4 sm:p-5 space-y-3`}>
-              <div>
-                <label className="block text-xs font-bold text-slate-600 dark:text-slate-300 mb-1">Broadcast Title</label>
-                <input className={inp} placeholder="e.g. Ramadan Mubarak / Server Maintenance Notice" value={nt} onChange={e => setNt(e.target.value)} required />
-              </div>
-              <div>
-                <label className="block text-xs font-bold text-slate-600 dark:text-slate-300 mb-1">Message Content</label>
-                <textarea rows="4" className={inp} placeholder="Write announcement details..." value={nb} onChange={e => setNb(e.target.value)} required />
-              </div>
-              <button className={`${B} text-white py-3 w-full shadow-md`} style={{ background: S.accent }}>
-                📡 Send Broadcast Live
-              </button>
-            </form>
-
-            <div className={`${card} p-4 space-y-2`}>
-              <h3 className="font-extrabold text-sm text-slate-900 dark:text-white">Broadcast History</h3>
-              {anns.length === 0 ? (
-                <p className="text-xs text-slate-400 py-3">No announcements sent yet</p>
-              ) : (
-                anns.map(a => (
-                  <div key={a.id} className="p-3 rounded-xl bg-slate-50 dark:bg-slate-700/50 text-xs">
-                    <div className="flex justify-between font-bold">
-                      <b className="text-slate-900 dark:text-white">{a.title}</b>
-                      <span className="text-slate-400 font-mono">{a.date}</span>
-                    </div>
-                    <p className="mt-1 whitespace-pre-wrap text-slate-700 dark:text-slate-300">{a.body}</p>
-                  </div>
-                ))
-              )}
-            </div>
-          </>
-        )}
-
-        {/* ============ PAGE 6: SETTINGS ============ */}
-        {page === 'settings' && (
-          <>
-            <div>
-              <h2 className="text-xl font-extrabold text-slate-900 dark:text-white">Admin & System Settings</h2>
-              <p className="text-xs text-slate-500 dark:text-slate-400">Brand identity, UPI IDs, subscription fees, and admin security</p>
-            </div>
-            <form onSubmit={saveSettings} className="space-y-4">
-              {/* Brand & Theme */}
-              <div className={`${card} p-4 space-y-3`}>
-                <h3 className="font-extrabold text-sm text-slate-900 dark:text-white">🎨 Brand Identity & Theme</h3>
-                <div className="flex items-center gap-4">
-                  <div className="w-20 h-20 rounded-2xl flex items-center justify-center overflow-hidden shadow-sm" style={{ background: draft.accent }}>
-                    {draft.logo ? <img src={draft.logo} alt="" className="w-full h-full object-cover" /> : <span className="text-3xl">🕌</span>}
-                  </div>
-                  <div className="space-x-2">
-                    <input id="logoIn" type="file" accept="image/*" className="hidden" onChange={e => e.target.files[0] && compress(e.target.files[0], 160, 0.85).then(u => setDraft(d => ({ ...d, logo: u }))).catch(() => say('Image error', 'err'))} />
-                    <label htmlFor="logoIn" className={`${B} bg-slate-100 dark:bg-slate-700 cursor-pointer inline-block`}>📸 Upload Logo</label>
-                    {draft.logo && <button type="button" onClick={() => setDraft(d => ({ ...d, logo: '' }))} className={`${B} bg-rose-50 text-rose-700`}>Remove</button>}
-                  </div>
-                </div>
-                <div className="grid sm:grid-cols-2 gap-3">
-                  <label className="text-xs font-bold block">Panel Name<input className={inp} value={draft.brand} onChange={e => setDraft({ ...draft, brand: e.target.value })} /></label>
-                  <label className="text-xs font-bold block">Tagline<input className={inp} value={draft.tagline} onChange={e => setDraft({ ...draft, tagline: e.target.value })} /></label>
-                </div>
-                <div>
-                  <div className="text-xs font-bold mb-1">Accent Color</div>
-                  <div className="flex flex-wrap items-center gap-2">
-                    {['#0c6b4f', '#0f766e', '#1d4ed8', '#7c3aed', '#be123c', '#b45309', '#0f172a'].map(c => (
-                      <button type="button" key={c} onClick={() => setDraft({ ...draft, accent: c })} className="w-9 h-9 rounded-full border-4" style={{ background: c, borderColor: draft.accent === c ? '#facc15' : 'transparent' }} />
-                    ))}
-                    <input type="color" value={draft.accent} onChange={e => setDraft({ ...draft, accent: e.target.value })} className="w-10 h-10 rounded cursor-pointer" />
-                  </div>
-                </div>
-              </div>
-
-              {/* Subscriptions & UPI */}
-              <div className={`${card} p-4 space-y-3`}>
-                <h3 className="font-extrabold text-sm text-slate-900 dark:text-white">💳 Mosque Subscription Fees & Payment QR</h3>
-                <div className="grid sm:grid-cols-2 gap-3">
-                  <label className="text-xs font-bold block">Monthly Fee (₹)<input type="number" min="0" className={inp} value={draft.monthlyFee} onChange={e => setDraft({ ...draft, monthlyFee: e.target.value })} /></label>
-                  <label className="text-xs font-bold block">Yearly Fee (₹)<input type="number" min="0" className={inp} value={draft.yearlyFee} onChange={e => setDraft({ ...draft, yearlyFee: e.target.value })} /></label>
-                </div>
-                <label className="text-xs font-bold block">Promo Announcement Banner (Optional)<input className={inp} value={draft.promoNote} onChange={e => setDraft({ ...draft, promoNote: e.target.value })} placeholder="e.g. Ramadan Mubarak Special: 1 Year at ₹299" /></label>
-                <div className="flex flex-wrap items-center gap-4">
-                  <img src={draft.qrPhoto || qrImg(draft.upiId, draft.brand, draft.yearlyFee)} alt="QR" className="w-28 h-28 rounded-xl border bg-white p-1" />
-                  <div className="flex-1 min-w-[200px] space-y-2">
-                    <label className="text-xs font-bold block">Subscription Payment UPI ID<input className={`${inp} font-mono`} value={draft.upiId} onChange={e => setDraft({ ...draft, upiId: e.target.value })} /></label>
-                    <input id="qr1" type="file" accept="image/*" className="hidden" onChange={e => e.target.files[0] && compress(e.target.files[0], 500).then(u => setDraft(d => ({ ...d, qrPhoto: u })))} />
-                    <label htmlFor="qr1" className={`${B} bg-slate-100 dark:bg-slate-700 cursor-pointer inline-block`}>📸 Upload Custom QR</label>
-                    {draft.qrPhoto && <button type="button" onClick={() => setDraft({ ...draft, qrPhoto: '' })} className={`${B} bg-rose-50 text-rose-700 ml-2`}>Use Auto QR</button>}
-                  </div>
-                </div>
-              </div>
-
-              {/* Server Donation Support */}
-              <div className={`${card} p-4 space-y-3`}>
-                <h3 className="font-extrabold text-sm text-slate-900 dark:text-white">💝 Public Voluntary Server Support (Donations)</h3>
-                <div className="flex flex-wrap items-center gap-4">
-                  <img src={draft.serverQr || qrImg(draft.serverUpi, draft.brand)} alt="QR" className="w-28 h-28 rounded-xl border bg-white p-1" />
-                  <div className="flex-1 min-w-[200px] space-y-2">
-                    <label className="text-xs font-bold block">Donation UPI ID<input className={`${inp} font-mono`} value={draft.serverUpi} onChange={e => setDraft({ ...draft, serverUpi: e.target.value })} /></label>
-                    <input id="qr2" type="file" accept="image/*" className="hidden" onChange={e => e.target.files[0] && compress(e.target.files[0], 500).then(u => setDraft(d => ({ ...d, serverQr: u })))} />
-                    <label htmlFor="qr2" className={`${B} bg-slate-100 dark:bg-slate-700 cursor-pointer inline-block`}>📸 Upload Custom QR</label>
-                    {draft.serverQr && <button type="button" onClick={() => setDraft({ ...draft, serverQr: '' })} className={`${B} bg-rose-50 text-rose-700 ml-2`}>Use Auto QR</button>}
-                  </div>
-                </div>
-                <label className="text-xs font-bold block">Donation Appeal Message<textarea rows="3" className={inp} value={draft.supportMessage} onChange={e => setDraft({ ...draft, supportMessage: e.target.value })} /></label>
-              </div>
-
-              {/* Contact & Helpline */}
-              <div className={`${card} p-4 space-y-3`}>
-                <h3 className="font-extrabold text-sm text-slate-900 dark:text-white">📞 Helpline & Contact Details</h3>
-                <div className="grid sm:grid-cols-2 gap-3">
-                  <label className="text-xs font-bold block">Helpline Phone<input className={inp} value={draft.phone} onChange={e => setDraft({ ...draft, phone: e.target.value })} /></label>
-                  <label className="text-xs font-bold block">WhatsApp Number (with 91)<input className={inp} value={draft.whatsapp} onChange={e => setDraft({ ...draft, whatsapp: e.target.value })} /></label>
-                </div>
-              </div>
-
-              {/* Admin Security */}
-              <div className={`${card} p-4 space-y-3`}>
-                <h3 className="font-extrabold text-sm text-slate-900 dark:text-white">🔐 Admin Security & Passcode</h3>
-                <div className="grid sm:grid-cols-2 gap-3">
-                  <label className="text-xs font-bold block">
-                    Master Admin Passcode (Default: 786)
-                    <input className={`${inp} font-mono`} value={draft.adminPasscode || '786'} onChange={e => setDraft({ ...draft, adminPasscode: e.target.value })} />
-                  </label>
                   <div>
-                    <div className="text-xs font-bold mb-1">Current Logged-in Identity</div>
-                    <div className="p-2.5 rounded-xl bg-slate-100 dark:bg-slate-700/60 font-mono text-xs font-bold text-slate-700 dark:text-slate-300">
-                      {user.email || 'Super Admin (Master Passcode)'}
+                    <div className="text-xs font-bold mb-1">Accent Color</div>
+                    <div className="flex flex-wrap items-center gap-2">
+                      {['#0c6b4f', '#0f766e', '#1d4ed8', '#7c3aed', '#be123c', '#b45309', '#0f172a'].map(c => (
+                        <button type="button" key={c} onClick={() => setDraft({ ...draft, accent: c })} className="w-9 h-9 rounded-full border-4" style={{ background: c, borderColor: draft.accent === c ? '#facc15' : 'transparent' }} />
+                      ))}
+                      <input type="color" value={draft.accent} onChange={e => setDraft({ ...draft, accent: e.target.value })} className="w-10 h-10 rounded cursor-pointer" />
                     </div>
                   </div>
                 </div>
-              </div>
 
-              <div className="flex flex-wrap gap-2 pt-2">
-                <button type="submit" className={`${B} text-white py-3 px-6 text-sm shadow-md`} style={{ background: S.accent }}>
-                  💾 Save All Settings
-                </button>
-                {user.email && user.email.includes('@') && auth && (
+                <div className={`${card} p-4 space-y-3`}>
+                  <h3 className="font-extrabold text-sm text-slate-900 dark:text-white">💳 Mosque Subscription Fees & Payment QR</h3>
+                  <div className="grid sm:grid-cols-2 gap-3">
+                    <label className="text-xs font-bold block">Monthly Fee (₹)<input type="number" min="0" className={inp} value={draft.monthlyFee} onChange={e => setDraft({ ...draft, monthlyFee: e.target.value })} /></label>
+                    <label className="text-xs font-bold block">Yearly Fee (₹)<input type="number" min="0" className={inp} value={draft.yearlyFee} onChange={e => setDraft({ ...draft, yearlyFee: e.target.value })} /></label>
+                  </div>
+                  <label className="text-xs font-bold block">Promo Announcement Banner (Optional)<input className={inp} value={draft.promoNote} onChange={e => setDraft({ ...draft, promoNote: e.target.value })} placeholder="e.g. Ramadan Mubarak Special: 1 Year at ₹99" /></label>
+                  <div className="flex flex-wrap items-center gap-4">
+                    <img src={draft.qrPhoto || qrImg(draft.upiId, draft.brand, draft.yearlyFee)} alt="QR" className="w-28 h-28 rounded-xl border bg-white p-1" />
+                    <div className="flex-1 min-w-[200px] space-y-2">
+                      <label className="text-xs font-bold block">Subscription Payment UPI ID<input className={`${inp} font-mono`} value={draft.upiId} onChange={e => setDraft({ ...draft, upiId: e.target.value })} /></label>
+                      <input id="qr1" type="file" accept="image/*" className="hidden" onChange={e => e.target.files[0] && compress(e.target.files[0], 500).then(u => setDraft(d => ({ ...d, qrPhoto: u })))} />
+                      <label htmlFor="qr1" className={`${B} bg-slate-100 dark:bg-slate-700 cursor-pointer inline-block`}>📸 Upload Custom QR</label>
+                      {draft.qrPhoto && <button type="button" onClick={() => setDraft({ ...draft, qrPhoto: '' })} className={`${B} bg-rose-50 text-rose-700 ml-2`}>Use Auto QR</button>}
+                    </div>
+                  </div>
+                </div>
+
+                <div className={`${card} p-4 space-y-3`}>
+                  <h3 className="font-extrabold text-sm text-slate-900 dark:text-white">💝 Public Voluntary Server Support (Donations)</h3>
+                  <div className="flex flex-wrap items-center gap-4">
+                    <img src={draft.serverQr || qrImg(draft.serverUpi, draft.brand)} alt="QR" className="w-28 h-28 rounded-xl border bg-white p-1" />
+                    <div className="flex-1 min-w-[200px] space-y-2">
+                      <label className="text-xs font-bold block">Donation UPI ID<input className={`${inp} font-mono`} value={draft.serverUpi} onChange={e => setDraft({ ...draft, serverUpi: e.target.value })} /></label>
+                      <input id="qr2" type="file" accept="image/*" className="hidden" onChange={e => e.target.files[0] && compress(e.target.files[0], 500).then(u => setDraft(d => ({ ...d, serverQr: u })))} />
+                      <label htmlFor="qr2" className={`${B} bg-slate-100 dark:bg-slate-700 cursor-pointer inline-block`}>📸 Upload Custom QR</label>
+                      {draft.serverQr && <button type="button" onClick={() => setDraft({ ...draft, serverQr: '' })} className={`${B} bg-rose-50 text-rose-700 ml-2`}>Use Auto QR</button>}
+                    </div>
+                  </div>
+                  <label className="text-xs font-bold block">Donation Appeal Message<textarea rows="3" className={inp} value={draft.supportMessage} onChange={e => setDraft({ ...draft, supportMessage: e.target.value })} /></label>
+                </div>
+
+                <div className={`${card} p-4 space-y-3`}>
+                  <h3 className="font-extrabold text-sm text-slate-900 dark:text-white">📞 Helpline & Contact Details</h3>
+                  <div className="grid sm:grid-cols-2 gap-3">
+                    <label className="text-xs font-bold block">Helpline Phone<input className={inp} value={draft.phone} onChange={e => setDraft({ ...draft, phone: e.target.value })} /></label>
+                    <label className="text-xs font-bold block">WhatsApp Number (with 91)<input className={inp} value={draft.whatsapp} onChange={e => setDraft({ ...draft, whatsapp: e.target.value })} /></label>
+                  </div>
+                </div>
+
+                <div className={`${card} p-4 space-y-3`}>
+                  <h3 className="font-extrabold text-sm text-slate-900 dark:text-white">🔐 Admin Security & Passcode</h3>
+                  <div className="grid sm:grid-cols-2 gap-3">
+                    <label className="text-xs font-bold block">
+                      Master Admin Passcode (Default: 786)
+                      <input className={`${inp} font-mono`} value={draft.adminPasscode || '786'} onChange={e => setDraft({ ...draft, adminPasscode: e.target.value })} />
+                    </label>
+                    <div>
+                      <div className="text-xs font-bold mb-1">Current Logged-in Identity</div>
+                      <div className="p-2.5 rounded-xl bg-slate-100 dark:bg-slate-700/60 font-mono text-xs font-bold text-slate-700 dark:text-slate-300">
+                        {user.email || 'Super Admin (Master Passcode)'}
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+                <div className="flex flex-wrap gap-2 pt-2">
+                  <button type="submit" className={`${B} text-white py-3 px-6 text-sm shadow-md`} style={{ background: S.accent }}>
+                    💾 Save All Settings
+                  </button>
+                  {user.email && user.email.includes('@') && auth && (
+                    <button
+                      type="button"
+                      onClick={() => auth.sendPasswordResetEmail(user.email).then(() => say('Password reset email sent to ' + user.email)).catch(e => say(e.message, 'err'))}
+                      className={`${B} bg-slate-200 dark:bg-slate-700 text-slate-800 dark:text-slate-200 py-3`}
+                    >
+                      🔑 Email me Password Reset Link
+                    </button>
+                  )}
                   <button
                     type="button"
-                    onClick={() => auth.sendPasswordResetEmail(user.email).then(() => say('Password reset email sent to ' + user.email)).catch(e => say(e.message, 'err'))}
+                    onClick={() => {
+                      const u = URL.createObjectURL(new Blob([JSON.stringify({ at: new Date().toISOString(), settings: S, masjids }, null, 2)], { type: 'application/json' }));
+                      const a = document.createElement('a');
+                      a.href = u;
+                      a.download = `masjid_connect_backup_${today()}.json`;
+                      a.click();
+                      say('Backup downloaded');
+                    }}
                     className={`${B} bg-slate-200 dark:bg-slate-700 text-slate-800 dark:text-slate-200 py-3`}
                   >
-                    🔑 Email me Password Reset Link
+                    💾 Download JSON Cloud Backup
                   </button>
-                )}
-                <button
-                  type="button"
-                  onClick={() => {
-                    const u = URL.createObjectURL(new Blob([JSON.stringify({ at: new Date().toISOString(), settings: S, masjids }, null, 2)], { type: 'application/json' }));
-                    const a = document.createElement('a');
-                    a.href = u;
-                    a.download = `masjid_connect_backup_${today()}.json`;
-                    a.click();
-                    say('Backup downloaded');
-                  }}
-                  className={`${B} bg-slate-200 dark:bg-slate-700 text-slate-800 dark:text-slate-200 py-3`}
-                >
-                  💾 Download JSON Cloud Backup
-                </button>
-              </div>
-            </form>
-          </>
-        )}
-      </main>
+                </div>
+              </form>
+            </>
+          )}
+        </main>
+      </div>
 
-      {/* ============ MODAL: FULL VIEW ============ */}
+      {/* ============ MODAL: FULL VIEW (WITH FOLLOWERS LIST & 1-CLICK WHATSAPP) ============ */}
       {view && (() => {
         const m = masjids[view.id] || view;
         const inf = m.info || {};
@@ -2064,12 +2517,12 @@ function AdminApp() {
               <img
                 src={m.photo || 'https://images.unsplash.com/photo-1542816417-0983c9c9ad53?auto=format&fit=crop&w=300&q=60'}
                 alt=""
-                className="w-28 h-28 rounded-2xl object-cover border"
+                className="w-28 h-28 rounded-2xl object-cover border shrink-0"
               />
               <div className="flex-1 min-w-[200px]">
                 <div className="flex flex-wrap gap-1.5 mb-2">
                   <Chip c={STAT[s]}>{s.toUpperCase()}</Chip>
-                  {m.isVerified && <Chip c="bg-sky-500 text-white font-black">✓ Verified</Chip>}
+                  {m.isVerified && <Chip c="bg-sky-500 text-white font-black">✓ Verified Blue Tick</Chip>}
                   {m.isSuspended && <Chip c="bg-rose-600 text-white font-black">🚫 Suspended</Chip>}
                   {live[m.id] && <Chip c="bg-rose-600 text-white animate-pulse">● LIVE AZAN</Chip>}
                 </div>
@@ -2084,13 +2537,34 @@ function AdminApp() {
               </div>
             </div>
 
+            {/* Prominent Followers & Community Box */}
+            <div className="mt-4 p-3.5 rounded-2xl bg-emerald-50 dark:bg-emerald-950/40 border border-emerald-300 dark:border-emerald-800 flex items-center justify-between">
+              <div className="flex items-center gap-3">
+                <span className="text-3xl">👥</span>
+                <div>
+                  <h4 className="font-extrabold text-sm text-emerald-950 dark:text-emerald-200">
+                    मस्जिद से जुड़े मुक़्तदी / फ़ॉलोअर्स
+                  </h4>
+                  <p className="text-xs text-emerald-700 dark:text-emerald-400">
+                    इस मस्जिद को मुक़्तदियों द्वारा सेव व फॉलो किया गया है।
+                  </p>
+                </div>
+              </div>
+              <div className="text-right">
+                <span className="text-2xl font-black text-emerald-700 dark:text-emerald-300">
+                  {m.followersCount || 0}
+                </span>
+                <span className="block text-[10px] text-emerald-800 dark:text-emerald-400 font-bold uppercase">Followers</span>
+              </div>
+            </div>
+
             <div className="grid md:grid-cols-2 gap-x-6 mt-4">
               <div>
                 <h4 className="font-extrabold text-xs uppercase text-slate-400 mt-2">Imam & Login Access</h4>
                 <Row l="Imam Name" v={m.imamName} />
                 <Row l="Phone" v={m.phone} />
                 <Row l="Password (PIN)" v={<span>{showPin ? m.passcode : '••••'} <button className="text-xs underline ml-1 text-emerald-600 font-bold" onClick={() => setShowPin(!showPin)}>{showPin ? 'Hide' : 'Show'}</button></span>} />
-                <Row l="Followers (Muqtadi)" v={m.followersCount || 0} />
+                <Row l="Followers (Muqtadi)" v={`${m.followersCount || 0} Followers`} />
                 <Row l="Registered Date" v={m.registeredAtISO ? m.registeredAtISO.slice(0, 10) : ''} />
                 <Row l="Last Updated" v={m.updatedAt ? new Date(m.updatedAt).toLocaleString('en-GB') : ''} />
 
@@ -2147,9 +2621,15 @@ function AdminApp() {
               <button onClick={() => toggleFlag(m, 'isSuspended', 'Suspension')} className={`${B} ${m.isSuspended ? 'bg-emerald-600 text-white' : 'bg-rose-50 text-rose-700 border border-rose-300'}`}>
                 {m.isSuspended ? '✅ Restore' : '🚫 Suspend'}
               </button>
+              {/* 1-Click WhatsApp Direct Credentials Button */}
               {m.phone && (
-                <a target="_blank" rel="noreferrer" href={waLink(m.phone, `Assalamu Alaikum ${m.imamName || ''}, message from ${S.brand} admin regarding ${m.name} (ID ${m.id}).`)} className={`${B} bg-[#25D366] text-white flex items-center gap-1`}>
-                  💬 WhatsApp
+                <a
+                  target="_blank"
+                  rel="noreferrer"
+                  href={waLink(m.phone, `अस्सलाम अलैकुम हज़रत ${m.imamName || ''},\n\nमस्जिद कनेक्ट ऐप में आपकी मस्जिद का लॉगिन विवरण:\n🕌 मस्जिद: ${m.name}\n🆔 मस्जिद ID: ${m.id}\n🔑 पासवर्ड (PIN): ${m.passcode}\n\nऐप में इस ID और पासवर्ड से लॉगिन करें।`)}
+                  className={`${B} bg-[#25D366] text-white flex items-center gap-1 font-bold shadow-xs`}
+                >
+                  💬 1-Click WhatsApp ID/Password
                 </a>
               )}
               <button onClick={() => setDel(m)} className={`${B} bg-rose-600 text-white ml-auto`}>🗑️ Delete</button>
@@ -2215,34 +2695,68 @@ function AdminApp() {
         </Modal>
       )}
 
-      {/* ============ MODAL: PLAN & GRANULAR MANUAL OVERRIDES ============ */}
+      {/* ============ MODAL: PLAN & AUTO MULTI-MONTH CALCULATION ============ */}
       {planM && (() => {
         const m = masjids[planM.id] || planM;
         const s = eff(m);
+        const autoMonths = Math.max(1, Math.floor((Number(calcAmt) || 0) / (Number(calcRate) || 10)));
+        const autoExpiry = addMonths(today(), autoMonths);
 
         return (
-          <Modal title="Manage Plan & Access Permissions" sub={`${m.name} · Current Status: ${s.toUpperCase()}${m.paymentExpiry ? ' till ' + m.paymentExpiry : ''}`} onClose={() => setPlanM(null)}>
-            <div className="grid grid-cols-2 gap-2 mb-4">
-              <button onClick={() => activate(m, 'monthly').then(() => setPlanM(null))} className="p-3 rounded-2xl text-white font-extrabold text-sm text-left shadow-xs" style={{ background: S.accent }}>
-                📅 +1 Month
-                <div className="text-xs font-medium opacity-80">₹{S.monthlyFee} · 30 Days Access</div>
+          <Modal title="Manage Plan & Access Permissions" sub={`${m.name} · Current: ${s.toUpperCase()}${m.paymentExpiry ? ' till ' + m.paymentExpiry : ''}`} onClose={() => setPlanM(null)}>
+            {/* Quick Auto-Calculation Box */}
+            <div className="p-3.5 rounded-2xl bg-amber-50 dark:bg-amber-950/40 border border-amber-300 dark:border-amber-700 space-y-2 mb-3">
+              <div className="flex justify-between items-center text-xs font-bold text-amber-950 dark:text-amber-200">
+                <span>⚡ ऑटो-कैलकुलेशन (भुगतान राशि अनुसार)</span>
+                <span className="font-mono bg-amber-200 dark:bg-amber-800 px-2 py-0.5 rounded">
+                  ₹{calcRate}/महीना दर
+                </span>
+              </div>
+              <div className="grid grid-cols-2 gap-2 text-xs">
+                <label className="font-bold">प्राप्त राशि (₹)
+                  <input
+                    type="number"
+                    className={inp}
+                    value={calcAmt}
+                    onChange={e => setCalcAmt(Number(e.target.value) || 0)}
+                  />
+                </label>
+                <label className="font-bold">मासिक दर (₹/महीना)
+                  <input
+                    type="number"
+                    className={inp}
+                    value={calcRate}
+                    onChange={e => setCalcRate(Number(e.target.value) || 10)}
+                  />
+                </label>
+              </div>
+              <div className="p-2 rounded-xl bg-white dark:bg-slate-800 border border-amber-200 dark:border-amber-800 text-xs flex justify-between items-center">
+                <span><b>{autoMonths} महीने</b> की सर्विस सक्रिय होगी</span>
+                <b className="text-emerald-600 dark:text-emerald-400 font-mono">वैध: {autoExpiry}</b>
+              </div>
+              <button
+                type="button"
+                onClick={() => activateWithAmount(m, calcAmt, calcRate).then(() => setPlanM(null))}
+                className="w-full py-2.5 rounded-xl text-white font-black text-xs shadow-md transition"
+                style={{ background: S.accent }}
+              >
+                ⚡ ₹{calcAmt} के अनुसार {autoMonths} महीने तुरंत सक्रिय करें
               </button>
-              <button onClick={() => activate(m, 'yearly').then(() => setPlanM(null))} className="p-3 rounded-2xl bg-slate-900 text-white font-extrabold text-sm text-left shadow-xs">
-                🌟 +1 Year
-                <div className="text-xs font-medium opacity-80">₹{S.yearlyFee} · 12 Months Access</div>
-              </button>
+            </div>
+
+            <div className="grid grid-cols-2 gap-2 mb-4 text-xs">
               <button onClick={async () => {
                 await patch(m.id, { paymentPlan: 'free', paymentStatus: 'free', paymentAmount: 0, paymentExpiry: null, liveAzanAllowed: true, timeEditAllowed: true });
-                say('Marked Free');
+                say('Marked Free (Amount reset to ₹0)');
                 setPlanM(null);
-              }} className="p-3 rounded-2xl bg-sky-100 dark:bg-sky-950/60 text-sky-900 dark:text-sky-200 font-bold text-sm text-left">
-                🎁 Free / Waived
+              }} className="p-2.5 rounded-xl bg-sky-100 dark:bg-sky-950/60 text-sky-900 dark:text-sky-200 font-bold text-left">
+                🎁 Free / Waived (Reset ₹0)
               </button>
               <button onClick={async () => {
                 await patch(m.id, { paymentStatus: 'expired', liveAzanAllowed: false, timeEditAllowed: false });
                 say('Access Locked');
                 setPlanM(null);
-              }} className="p-3 rounded-2xl bg-rose-100 dark:bg-rose-950/60 text-rose-900 dark:text-rose-200 font-bold text-sm text-left">
+              }} className="p-2.5 rounded-xl bg-rose-100 dark:bg-rose-950/60 text-rose-900 dark:text-rose-200 font-bold text-left">
                 🔒 Lock Access Now
               </button>
             </div>
@@ -2269,39 +2783,47 @@ function AdminApp() {
                 isSuspended: suspended
               });
 
-              if (status === 'paid' && amt) await logPay(m, f.pl.value, amt, 'Manual Override');
+              if (status === 'paid' && amt > 0) {
+                await logPay(m, f.pl.value, amt, 'Manual Plan Update');
+              }
               say('Plan & custom feature permissions saved!');
               setPlanM(null);
             }}>
               <div className="font-bold text-slate-500 uppercase text-[10px]">Payment Plan & Expiry</div>
               <div className="grid grid-cols-2 gap-2">
                 <label className="font-bold">Plan Type
-                  <select name="pl" className={inp} defaultValue={m.paymentPlan || 'free'}>
-                    <option value="free">Free</option>
+                  <select name="pl" className={inp} defaultValue={m.paymentPlan || 'monthly'}>
                     <option value="monthly">Monthly</option>
                     <option value="yearly">Yearly</option>
+                    <option value="free">Free</option>
                     <option value="lifetime">Lifetime</option>
                   </select>
                 </label>
                 <label className="font-bold">Status
                   <select name="sts" className={inp} defaultValue={m.paymentStatus || 'free'}>
-                    <option value="free">Free</option>
                     <option value="paid">Paid</option>
+                    <option value="free">Free</option>
                     <option value="pending">Pending</option>
                     <option value="expired">Expired (Locked)</option>
                   </select>
                 </label>
               </div>
               <div className="grid grid-cols-2 gap-2">
-                <label className="font-bold">Amount Paid (₹)<input name="amt" type="number" className={inp} defaultValue={m.paymentAmount || 0} /></label>
-                <label className="font-bold">Valid Till Expiry Date<input name="ex" type="date" className={inp} defaultValue={m.paymentExpiry || ''} /></label>
+                <label className="font-bold">Amount Paid (₹)
+                  <input name="amt" type="number" className={inp} defaultValue={m.paymentAmount || calcAmt} />
+                </label>
+                <label className="font-bold">Valid Till Expiry Date
+                  <input name="ex" type="date" className={inp} defaultValue={m.paymentExpiry || autoExpiry} />
+                </label>
               </div>
-              <label className="font-bold block">Payment Note<input name="nt" className={inp} defaultValue={m.paymentNotes || ''} placeholder="e.g. Paid via Cash / UTR / Discounted" /></label>
+              <label className="font-bold block">Payment Note
+                <input name="nt" className={inp} defaultValue={m.paymentNotes || ''} placeholder="e.g. Paid via Cash / UTR / ₹30 for 3 Months" />
+              </label>
 
               {/* INDEPENDENT GRANULAR TOGGLES FOR PAID MOSQUE */}
               <div className="p-3 rounded-xl bg-slate-50 dark:bg-slate-700/60 border border-slate-200 dark:border-slate-600 space-y-2">
                 <div className="font-extrabold text-slate-700 dark:text-slate-200 uppercase text-[10px] tracking-wide">
-                  ⚙️ Individual Feature Controls (Aap chahein to Paid hone ke bawjood koi service band kar sakte hain)
+                  ⚙️ Individual Feature Controls (Paid होने पर भी कोई सर्विस बंद कर सकते हैं)
                 </div>
                 <div className="grid grid-cols-2 gap-2 font-bold">
                   <label className="flex items-center gap-1.5 cursor-pointer">
@@ -2332,23 +2854,20 @@ function AdminApp() {
         );
       })()}
 
-      {/* ============ MODAL: SEASONAL / RAMADAN PRICING CONTROLLER ============ */}
+      {/* ============ MODAL: SEASONAL PRICING ============ */}
       {bulkPricingModal && (
-        <Modal title="⚡ Seasonal / Ramadan Pricing Controller" sub="Ek click me sabhi masjido ke liye annual discount fee set karein" onClose={() => setBulkPricingModal(false)}>
+        <Modal title="⚡ Special / Seasonal Pricing Controller" sub="Ek click me sabhi masjido ke liye annual discount fee set karein" onClose={() => setBulkPricingModal(false)}>
           <div className="space-y-4 text-xs">
-            <p className="text-slate-600 dark:text-slate-300">
-              Aap Ramadan ya seasonal festive offers ke dauran sabhi masjido ko discount pricing de sakte hain.
-            </p>
             <div>
               <div className="font-bold text-slate-700 dark:text-slate-300 mb-1.5">Preset Offers:</div>
               <div className="grid grid-cols-4 gap-2">
-                {[199, 299, 499, 699].map(p => (
+                {[49, 99, 199, 299].map(p => (
                   <button
                     key={p}
                     type="button"
                     onClick={() => {
                       setBulkSeasonalFee(p);
-                      setBulkSeasonalNote(`Ramadan Mubarak Special: Annual Access just ₹${p}`);
+                      setBulkSeasonalNote(`Annual Access at just ₹${p}`);
                     }}
                     className={`p-2.5 rounded-xl border text-center font-black transition ${bulkSeasonalFee === p ? 'bg-amber-400 text-slate-900 border-amber-500 shadow-sm' : 'bg-slate-100 dark:bg-slate-700'}`}
                   >
@@ -2364,10 +2883,6 @@ function AdminApp() {
               <label className="font-bold block">Offer Banner Note
                 <input className={inp} value={bulkSeasonalNote} onChange={e => setBulkSeasonalNote(e.target.value)} />
               </label>
-            </div>
-
-            <div className="p-3 bg-amber-50 dark:bg-amber-950/30 border border-amber-200 dark:border-amber-800 rounded-xl text-amber-900 dark:text-amber-200">
-              💡 Yeh settings turant sabhi imamo ke payment card aur QR code me update ho jayegi.
             </div>
 
             <div className="flex gap-2 pt-2">
@@ -2387,12 +2902,12 @@ function AdminApp() {
                     if (mq && mq.connected) mq.publish(`${TOPIC}/db/admin_settings`, JSON.stringify(updatedSettings), { retain: true, qos: 1 });
                   } catch(e) {}
                   setBulkPricingModal(false);
-                  say(`Pricing updated to ₹${bulkSeasonalFee}/yr with banner!`);
+                  say(`Pricing updated to ₹${bulkSeasonalFee}/yr!`);
                 }}
                 className={`${B} text-white flex-[2] py-3 font-black shadow-md`}
                 style={{ background: S.accent }}
               >
-                Apply Seasonal Pricing Everywhere
+                Apply Special Pricing Everywhere
               </button>
             </div>
           </div>
