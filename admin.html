@@ -89,7 +89,101 @@ const DEF = {
   bannedDistricts: []
 };
 
-/* ================= HELPERS ================= */
+/* ================= ALL-INDIA STATES & SPELLING ALIASES ================= */
+const ALL_INDIA_STATES = [
+  'Uttar Pradesh', 'Bihar', 'Delhi', 'Madhya Pradesh', 'Maharashtra', 'West Bengal',
+  'Rajasthan', 'Gujarat', 'Karnataka', 'Telangana', 'Tamil Nadu', 'Kerala',
+  'Jharkhand', 'Punjab', 'Haryana', 'Uttarakhand', 'Assam', 'Odisha',
+  'Jammu & Kashmir', 'Andhra Pradesh', 'Chhattisgarh', 'Goa', 'Himachal Pradesh',
+  'Tripura', 'Manipur', 'Meghalaya', 'Nagaland', 'Mizoram', 'Sikkim',
+  'Arunachal Pradesh', 'Chandigarh', 'Puducherry', 'Ladakh'
+];
+
+const POPULAR_DISTRICTS = [
+  'Mau', 'Ballia', 'Azamgarh', 'Ghazipur', 'Varanasi', 'Gorakhpur', 'Jaunpur', 'Deoria',
+  'Basti', 'Sant Kabir Nagar', 'Lucknow', 'Kanpur', 'Prayagraj', 'Meerut', 'Bareilly',
+  'Aligarh', 'Moradabad', 'Saharanpur', 'Muzaffarnagar', 'Rampur', 'Sambhal', 'Bijnor',
+  'Agra', 'Faizabad', 'Ayodhya', 'Sultanpur', 'Pratapgarh', 'Gonda', 'Bahraich',
+  'Barabanki', 'Sitapur', 'Hardoi', 'Noida', 'Ghaziabad', 'Patna', 'Gaya',
+  'Muzaffarpur', 'Bhagalpur', 'Darbhanga', 'Madhubani', 'Samastipur', 'Purnia', 'Katihar',
+  'Kishanganj', 'Siwan', 'Gopalganj', 'Motihari', 'Bettiah', 'Bhopal', 'Indore',
+  'Jaipur', 'Mumbai', 'Kolkata', 'Hyderabad', 'Bengaluru'
+];
+
+const STATE_ALIASES = {
+  'up': 'Uttar Pradesh', 'u.p.': 'Uttar Pradesh', 'u p': 'Uttar Pradesh',
+  'uttar pradesh': 'Uttar Pradesh', 'uttarpradesh': 'Uttar Pradesh',
+  'utter pradesh': 'Uttar Pradesh', 'utter pardesh': 'Uttar Pradesh',
+  'uttar pardesh': 'Uttar Pradesh', 'u. p.': 'Uttar Pradesh',
+  'bihar': 'Bihar', 'br': 'Bihar',
+  'mp': 'Madhya Pradesh', 'm.p.': 'Madhya Pradesh', 'm p': 'Madhya Pradesh',
+  'madhya pradesh': 'Madhya Pradesh', 'madhyapradesh': 'Madhya Pradesh',
+  'delhi': 'Delhi', 'new delhi': 'Delhi', 'dl': 'Delhi', 'd.l.': 'Delhi',
+  'rajasthan': 'Rajasthan', 'rj': 'Rajasthan',
+  'maharashtra': 'Maharashtra', 'mh': 'Maharashtra',
+  'wb': 'West Bengal', 'west bengal': 'West Bengal', 'westbengal': 'West Bengal', 'bengal': 'West Bengal',
+  'jharkhand': 'Jharkhand', 'jh': 'Jharkhand',
+  'gujarat': 'Gujarat', 'gj': 'Gujarat',
+  'telangana': 'Telangana', 'ts': 'Telangana',
+  'karnataka': 'Karnataka', 'ka': 'Karnataka',
+  'kerala': 'Kerala', 'kl': 'Kerala',
+  'tamil nadu': 'Tamil Nadu', 'tamilnadu': 'Tamil Nadu', 'tn': 'Tamil Nadu',
+  'andhra pradesh': 'Andhra Pradesh', 'andhra': 'Andhra Pradesh', 'ap': 'Andhra Pradesh',
+  'punjab': 'Punjab', 'pb': 'Punjab',
+  'haryana': 'Haryana', 'hr': 'Haryana',
+  'uttarakhand': 'Uttarakhand', 'uk': 'Uttarakhand',
+  'assam': 'Assam', 'as': 'Assam',
+  'odisha': 'Odisha', 'orissa': 'Odisha', 'or': 'Odisha', 'od': 'Odisha',
+  'jammu and kashmir': 'Jammu & Kashmir', 'j&k': 'Jammu & Kashmir', 'jk': 'Jammu & Kashmir', 'kashmir': 'Jammu & Kashmir'
+};
+
+/* ================= SMART LOCATION NORMALIZERS ================= */
+const cleanText = (t) => String(t || '').trim().toLowerCase();
+const stripPunct = (t) => cleanText(t).replace(/[^a-z0-9]/g, '');
+
+const normalizeState = (rawState) => {
+  if (!rawState) return '';
+  const c = cleanText(rawState);
+  if (STATE_ALIASES[c]) return STATE_ALIASES[c];
+  const p = stripPunct(c);
+  for (const [k, v] of Object.entries(STATE_ALIASES)) {
+    if (stripPunct(k) === p) return v;
+  }
+  return rawState.trim();
+};
+
+// Smart matching: Handles UP, U.P., Uttar Pardesh, address mentions
+const isMosqueInState = (m, targetState) => {
+  if (!targetState || targetState === 'all') return true;
+  const normTarget = normalizeState(targetState);
+  const targetKey = stripPunct(normTarget);
+  if (!targetKey) return true;
+
+  const mStateNorm = normalizeState(m.stateName);
+  const mStateKey = stripPunct(mStateNorm);
+  if (mStateKey === targetKey || mStateKey.includes(targetKey) || targetKey.includes(mStateKey)) return true;
+
+  const addrKey = stripPunct(m.address);
+  const locKey = stripPunct(m.stateLocation);
+  if (addrKey.includes(targetKey) || locKey.includes(targetKey)) return true;
+
+  if (targetKey === 'uttarpradesh' && (/\bup\b/i.test(m.stateName || '') || /\bup\b/i.test(m.address || ''))) return true;
+  if (targetKey === 'madhyapradesh' && (/\bmp\b/i.test(m.stateName || '') || /\bmp\b/i.test(m.address || ''))) return true;
+  return false;
+};
+
+// Smart matching for district/city: Handles Mau, Ballia, Azamgarh, etc.
+const isMosqueInDistrict = (m, targetDistrict) => {
+  if (!targetDistrict || targetDistrict === 'all') return true;
+  const tKey = stripPunct(targetDistrict);
+  if (!tKey) return true;
+  const locKey = stripPunct(m.stateLocation);
+  const addrKey = stripPunct(m.address);
+  const nameKey = stripPunct(m.name);
+  return locKey.includes(tKey) || addrKey.includes(tKey) || tKey.includes(locKey);
+};
+
+/* ================= GENERAL HELPERS ================= */
 const pad = n => String(n).padStart(2, '0');
 const iso = d => `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
 const today = () => iso(new Date());
@@ -213,10 +307,16 @@ function AdminApp() {
   const [del, setDel] = useState(null);
   const [confirm, setConfirm] = useState(null);
 
-  // Filters
+  // Filters (Multi-filter support)
   const [q, setQ] = useState('');
   const [fState, setFState] = useState('all');
+  const [fDistrict, setFDistrict] = useState('all');
   const [fStat, setFStat] = useState('all');
+
+  // Pre-ban inputs in Regions tab
+  const [customBanType, setCustomBanType] = useState('district'); // 'district' | 'state'
+  const [customBanInput, setCustomBanInput] = useState('');
+  const [regionFilter, setRegionFilter] = useState('');
 
   // Drafts & inputs
   const [draft, setDraft] = useState(S);
@@ -225,7 +325,6 @@ function AdminApp() {
   const [bulkPricingModal, setBulkPricingModal] = useState(false);
   const [bulkSeasonalFee, setBulkSeasonalFee] = useState(299);
   const [bulkSeasonalNote, setBulkSeasonalNote] = useState('Ramadan Mubarak Special: Annual Access ₹299');
-  const [regionFilter, setRegionFilter] = useState('');
   const swept = useRef({});
 
   const say = (m, t = 'ok') => {
@@ -405,21 +504,28 @@ function AdminApp() {
       .then(() => say(`${exp.length} plan expired — access locked automatically`));
   }, [loaded, masjids]);
 
-  const activate = async (m, plan, status) => {
+  /* Plan Activation with Independent Granular Controls */
+  const activate = async (m, plan, status, customOverrides = {}) => {
     const months = plan === 'monthly' ? 1 : 12;
     const amount = plan === 'monthly' ? S.monthlyFee : S.yearlyFee;
     const base = (m.paymentExpiry && m.paymentExpiry >= today() && eff(m) === 'paid') ? m.paymentExpiry : today();
     const expiry = addMonths(base, months);
-    await patch(m.id, {
+
+    // Keep liveAzan, timeEdit, isVerified respectful of manual admin overrides
+    const updateData = {
       paymentPlan: plan,
       paymentStatus: 'paid',
       paymentExpiry: expiry,
       paymentAmount: amount,
       paymentStart: today(),
-      liveAzanAllowed: true,
-      timeEditAllowed: true,
-      pendingUtr: null
-    });
+      liveAzanAllowed: customOverrides.liveAzanAllowed !== undefined ? customOverrides.liveAzanAllowed : (m.liveAzanAllowed !== false),
+      timeEditAllowed: customOverrides.timeEditAllowed !== undefined ? customOverrides.timeEditAllowed : (m.timeEditAllowed !== false),
+      isVerified: customOverrides.isVerified !== undefined ? customOverrides.isVerified : !!m.isVerified,
+      pendingUtr: null,
+      ...customOverrides
+    };
+
+    await patch(m.id, updateData);
     await logPay(m, plan, amount, status || 'Admin activated');
     say(`${m.name}: ${plan === 'monthly' ? '1 Month' : '1 Year'} activated till ${expiry}`);
   };
@@ -427,7 +533,11 @@ function AdminApp() {
   const approveReq = async (r, plan) => {
     const m = masjids[r.masjidId];
     if (!m) return say('Masjid not found', 'err');
-    await activate(m, plan, 'UTR ' + (r.utr || ''));
+    // Activates paid plan while preserving independent switches
+    await activate(m, plan, 'Approved UTR: ' + (r.utr || ''), {
+      liveAzanAllowed: true,
+      timeEditAllowed: true
+    });
     await db.collection('payment_requests').doc(r.id).set({ status: 'approved', approvedAt: Date.now(), plan }, { merge: true });
   };
 
@@ -436,6 +546,7 @@ function AdminApp() {
     say('Request rejected');
   };
 
+  // 1-Click Granular Toggles (Completely Independent from Payment Status)
   const toggle = (m, k, label) => {
     const v = !(m[k] !== false);
     patch(m.id, { [k]: v });
@@ -498,34 +609,41 @@ function AdminApp() {
     say('Announcement sent');
   };
 
-  /* ================= 1-CLICK STATE & DISTRICT BAN FUNCTIONS ================= */
-  const handleBanState = (stateName) => {
-    const affected = all.filter(m => (m.stateName || 'Unknown').trim().toLowerCase() === stateName.trim().toLowerCase());
+  /* ================= 1-CLICK STATE & DISTRICT BAN & PRE-BAN SYSTEM ================= */
+  const handleBanState = (rawStateName) => {
+    const normState = normalizeState(rawStateName) || rawStateName.trim();
+    const affected = all.filter(m => isMosqueInState(m, normState));
     setConfirm({
-      t: `🚫 Ban Entire State: "${stateName}"?`,
-      d: `This will suspend all ${affected.length} mosques in ${stateName}. They will be immediately hidden from the main app and both Live Azan and Time Editing will be locked.`,
+      t: `🚫 Ban Entire State: "${normState}"?`,
+      d: `This will suspend all ${affected.length} registered mosques in ${normState} and pre-ban any future registrations. All users & imams in ${normState} will be blocked from accessing the app.`,
       go: async () => {
         await batchPatch(affected, () => ({
           isSuspended: true,
           liveAzanAllowed: false,
           timeEditAllowed: false,
-          banReason: `State-wide suspension: ${stateName}`
+          banReason: `State-wide suspension: ${normState}`
         }));
-        // Update bannedStates list in settings
-        const updatedBanned = [...new Set([...(S.bannedStates || []), stateName])];
+        const updatedBanned = [...new Set([...(S.bannedStates || []), normState])];
         const newS = { ...S, bannedStates: updatedBanned };
         setS(newS);
-        if (db) db.collection('config').doc('admin_settings').set({ bannedStates: updatedBanned }, { merge: true });
-        say(`State "${stateName}" successfully BANNED (${affected.length} mosques)`);
+        if (db) await db.collection('config').doc('admin_settings').set({ bannedStates: updatedBanned }, { merge: true });
+        try {
+          if (mq && mq.connected) {
+            mq.publish(`${TOPIC}/db/admin_settings`, JSON.stringify(newS), { retain: true, qos: 1 });
+            mq.publish(`${TOPIC}/events`, JSON.stringify({ type: 'STATE_BANNED', stateName: normState, count: affected.length }), { qos: 1 });
+          }
+        } catch(e) {}
+        say(`State "${normState}" successfully BANNED (${affected.length} mosques locked)`);
       }
     });
   };
 
-  const handleUnbanState = (stateName) => {
-    const affected = all.filter(m => (m.stateName || 'Unknown').trim().toLowerCase() === stateName.trim().toLowerCase());
+  const handleUnbanState = (rawStateName) => {
+    const normState = normalizeState(rawStateName) || rawStateName.trim();
+    const affected = all.filter(m => isMosqueInState(m, normState));
     setConfirm({
-      t: `✅ Restore State: "${stateName}"?`,
-      d: `All ${affected.length} mosques in ${stateName} will be restored to active status with Live Azan and Time Editing allowed.`,
+      t: `✅ Restore State: "${normState}"?`,
+      d: `All ${affected.length} mosques in ${normState} will be restored to active status with Live Azan and Time Editing allowed.`,
       go: async () => {
         await batchPatch(affected, () => ({
           isSuspended: false,
@@ -533,41 +651,55 @@ function AdminApp() {
           timeEditAllowed: true,
           banReason: null
         }));
-        const updatedBanned = (S.bannedStates || []).filter(s => s.toLowerCase() !== stateName.toLowerCase());
+        const updatedBanned = (S.bannedStates || []).filter(s => stripPunct(s) !== stripPunct(normState));
         const newS = { ...S, bannedStates: updatedBanned };
         setS(newS);
-        if (db) db.collection('config').doc('admin_settings').set({ bannedStates: updatedBanned }, { merge: true });
-        say(`State "${stateName}" UNBANNED (${affected.length} mosques active)`);
+        if (db) await db.collection('config').doc('admin_settings').set({ bannedStates: updatedBanned }, { merge: true });
+        try {
+          if (mq && mq.connected) {
+            mq.publish(`${TOPIC}/db/admin_settings`, JSON.stringify(newS), { retain: true, qos: 1 });
+            mq.publish(`${TOPIC}/events`, JSON.stringify({ type: 'STATE_UNBANNED', stateName: normState }), { qos: 1 });
+          }
+        } catch(e) {}
+        say(`State "${normState}" UNBANNED (${affected.length} mosques active)`);
       }
     });
   };
 
-  const handleBanDistrict = (districtName, stateName) => {
-    const affected = all.filter(m => (m.stateLocation || 'Unknown').trim().toLowerCase() === districtName.trim().toLowerCase());
+  const handleBanDistrict = (rawDistrictName, rawStateName = '') => {
+    const cleanDist = rawDistrictName.trim();
+    const affected = all.filter(m => isMosqueInDistrict(m, cleanDist));
     setConfirm({
-      t: `🚫 Ban Entire District: "${districtName}"?`,
-      d: `This will suspend all ${affected.length} mosques in district ${districtName} (${stateName || ''}). They will be hidden from the app and locked.`,
+      t: `🚫 Ban Entire District: "${cleanDist}"?`,
+      d: `This will suspend all ${affected.length} mosques in district ${cleanDist} ${rawStateName ? '(' + rawStateName + ')' : ''} and pre-ban that district so users cannot use the app there.`,
       go: async () => {
         await batchPatch(affected, () => ({
           isSuspended: true,
           liveAzanAllowed: false,
           timeEditAllowed: false,
-          banReason: `District-wide suspension: ${districtName}`
+          banReason: `District-wide suspension: ${cleanDist}`
         }));
-        const updatedBanned = [...new Set([...(S.bannedDistricts || []), districtName])];
+        const updatedBanned = [...new Set([...(S.bannedDistricts || []), cleanDist])];
         const newS = { ...S, bannedDistricts: updatedBanned };
         setS(newS);
-        if (db) db.collection('config').doc('admin_settings').set({ bannedDistricts: updatedBanned }, { merge: true });
-        say(`District "${districtName}" BANNED (${affected.length} mosques)`);
+        if (db) await db.collection('config').doc('admin_settings').set({ bannedDistricts: updatedBanned }, { merge: true });
+        try {
+          if (mq && mq.connected) {
+            mq.publish(`${TOPIC}/db/admin_settings`, JSON.stringify(newS), { retain: true, qos: 1 });
+            mq.publish(`${TOPIC}/events`, JSON.stringify({ type: 'DISTRICT_BANNED', districtName: cleanDist, count: affected.length }), { qos: 1 });
+          }
+        } catch(e) {}
+        say(`District "${cleanDist}" BANNED (${affected.length} mosques locked)`);
       }
     });
   };
 
-  const handleUnbanDistrict = (districtName) => {
-    const affected = all.filter(m => (m.stateLocation || 'Unknown').trim().toLowerCase() === districtName.trim().toLowerCase());
+  const handleUnbanDistrict = (rawDistrictName) => {
+    const cleanDist = rawDistrictName.trim();
+    const affected = all.filter(m => isMosqueInDistrict(m, cleanDist));
     setConfirm({
-      t: `✅ Restore District: "${districtName}"?`,
-      d: `All ${affected.length} mosques in district ${districtName} will be restored.`,
+      t: `✅ Restore District: "${cleanDist}"?`,
+      d: `All ${affected.length} mosques in district ${cleanDist} will be restored.`,
       go: async () => {
         await batchPatch(affected, () => ({
           isSuspended: false,
@@ -575,13 +707,32 @@ function AdminApp() {
           timeEditAllowed: true,
           banReason: null
         }));
-        const updatedBanned = (S.bannedDistricts || []).filter(d => d.toLowerCase() !== districtName.toLowerCase());
+        const updatedBanned = (S.bannedDistricts || []).filter(d => stripPunct(d) !== stripPunct(cleanDist));
         const newS = { ...S, bannedDistricts: updatedBanned };
         setS(newS);
-        if (db) db.collection('config').doc('admin_settings').set({ bannedDistricts: updatedBanned }, { merge: true });
-        say(`District "${districtName}" UNBANNED (${affected.length} mosques active)`);
+        if (db) await db.collection('config').doc('admin_settings').set({ bannedDistricts: updatedBanned }, { merge: true });
+        try {
+          if (mq && mq.connected) {
+            mq.publish(`${TOPIC}/db/admin_settings`, JSON.stringify(newS), { retain: true, qos: 1 });
+            mq.publish(`${TOPIC}/events`, JSON.stringify({ type: 'DISTRICT_UNBANNED', districtName: cleanDist }), { qos: 1 });
+          }
+        } catch(e) {}
+        say(`District "${cleanDist}" UNBANNED (${affected.length} mosques active)`);
       }
     });
+  };
+
+  // Pre-ban any custom write-in or selected district/state
+  const handleAddCustomPreBan = (e) => {
+    e.preventDefault();
+    const val = customBanInput.trim();
+    if (!val) return;
+    if (customBanType === 'state') {
+      handleBanState(val);
+    } else {
+      handleBanDistrict(val);
+    }
+    setCustomBanInput('');
   };
 
   /* ================= LOGIN HANDLERS ================= */
@@ -628,7 +779,6 @@ function AdminApp() {
         say('Logged in successfully!');
         return;
       } catch (er) {
-        // If user not found, try to auto-create admin account
         if (er.code === 'auth/user-not-found' && pass.length >= 6) {
           try {
             const newCred = await auth.createUserWithEmailAndPassword(emailToUse, pass);
@@ -690,44 +840,112 @@ function AdminApp() {
     say('Logged out successfully');
   };
 
-  const exportCsv = list => {
-    const H = ['ID', 'Name', 'City', 'State', 'Address', 'Imam', 'Phone', 'Plan', 'Status', 'Expiry', 'Amount', 'Verified', 'Suspended', 'LiveAzan', 'TimeEdit', 'Lat', 'Lng', 'Followers'];
-    const rows = list.map(m => [
-      m.id, m.name, m.stateLocation, m.stateName, m.address, m.imamName, m.phone,
-      m.paymentPlan || 'free', eff(m), m.paymentExpiry || '', m.paymentAmount || 0,
-      m.isVerified ? 'Yes' : 'No', m.isSuspended ? 'Yes' : 'No',
+  /* ================= EXPORT DATA (CSV & JSON FULL FORMAT) ================= */
+  const exportCsv = (listToExport) => {
+    const H = [
+      'ID', 'Name', 'City/District', 'State', 'Address', 'Imam Name', 'Phone',
+      'Passcode/PIN', 'Plan', 'Status', 'Expiry Date', 'Amount Paid (INR)',
+      'Verified Blue Tick', 'Account Suspended', 'Live Azan Allowed', 'Time Edit Allowed',
+      'Latitude', 'Longitude', 'Followers (Muqtadi)', 'Maktab Available', 'Committee Contact', 'Registered Date', 'Last Updated'
+    ];
+    const rows = listToExport.map(m => [
+      m.id,
+      m.name,
+      m.stateLocation || '',
+      normalizeState(m.stateName) || m.stateName || '',
+      m.address || '',
+      m.imamName || '',
+      m.phone || '',
+      m.passcode || '',
+      m.paymentPlan || 'free',
+      eff(m),
+      m.paymentExpiry || '',
+      m.paymentAmount || 0,
+      m.isVerified ? 'Verified (Blue Tick)' : 'No',
+      m.isSuspended ? 'Suspended (Hidden)' : 'Active',
       m.liveAzanAllowed === false ? 'Blocked' : 'Allowed',
       m.timeEditAllowed === false ? 'Locked' : 'Allowed',
-      m.lat || '', m.lng || '', m.followersCount || 0
+      m.lat || '',
+      m.lng || '',
+      m.followersCount || 0,
+      m.info?.maktabHas === 'yes' ? 'Yes' : 'No',
+      m.info?.committeePhone || '',
+      m.registeredAtISO ? m.registeredAtISO.slice(0, 10) : '',
+      m.updatedAt ? new Date(m.updatedAt).toLocaleString('en-GB') : ''
     ].map(csvCell).join(','));
+
     const url = URL.createObjectURL(new Blob(['\uFEFF' + [H.join(','), ...rows].join('\r\n')], { type: 'text/csv;charset=utf-8;' }));
     const a = document.createElement('a');
     a.href = url;
-    a.download = `masjids_${today()}.csv`;
+    a.download = `masjids_filtered_${today()}.csv`;
     a.click();
     URL.revokeObjectURL(url);
-    say(`CSV exported (${list.length})`);
+    say(`CSV successfully exported (${listToExport.length} mosques)`);
   };
 
-  /* ================= DERIVED COMPUTATIONS ================= */
-  const all = useMemo(() => Object.values(masjids), [masjids]);
-  const states = useMemo(() => [...new Set(all.map(m => (m.stateName || '').trim()).filter(Boolean))].sort(), [all]);
+  const exportJson = (listToExport) => {
+    const jsonStr = JSON.stringify(listToExport, null, 2);
+    const url = URL.createObjectURL(new Blob([jsonStr], { type: 'application/json' }));
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `masjids_filtered_${today()}.json`;
+    a.click();
+    URL.revokeObjectURL(url);
+    say(`JSON successfully exported (${listToExport.length} mosques)`);
+  };
 
+  /* ================= DERIVED COMPUTATIONS & SMART FILTERS ================= */
+  const all = useMemo(() => Object.values(masjids), [masjids]);
+
+  // Unique normalized states from DB
+  const statesInDb = useMemo(() => {
+    const set = new Set();
+    all.forEach(m => {
+      const norm = normalizeState(m.stateName);
+      if (norm) set.add(norm);
+    });
+    return [...set].sort();
+  }, [all]);
+
+  // Unique districts from DB (optionally filtered by selected state)
+  const districtsInDb = useMemo(() => {
+    const set = new Set();
+    all.forEach(m => {
+      if (fState === 'all' || isMosqueInState(m, fState)) {
+        const d = (m.stateLocation || '').trim();
+        if (d) set.add(d);
+      }
+    });
+    return [...set].sort();
+  }, [all, fState]);
+
+  // Filtered mosques list based on all filters
   const list = useMemo(() => {
     const k = q.trim().toLowerCase();
     return all.filter(m => {
-      if (k && ![m.name, m.id, m.stateLocation, m.stateName, m.address, m.imamName, m.phone].some(x => String(x || '').toLowerCase().includes(k))) return false;
-      if (fState !== 'all' && (m.stateName || '') !== fState) return false;
+      // 1. Text Search Keyword
+      if (k && ![
+        m.name, m.id, m.stateLocation, m.stateName, m.address, m.imamName, m.phone, m.passcode
+      ].some(x => String(x || '').toLowerCase().includes(k))) return false;
+
+      // 2. Smart State Match (handles UP, uttar pardesh, etc.)
+      if (fState !== 'all' && !isMosqueInState(m, fState)) return false;
+
+      // 3. Smart District Match (handles Mau, Ballia, etc.)
+      if (fDistrict !== 'all' && !isMosqueInDistrict(m, fDistrict)) return false;
+
+      // 4. Status Filter
       const s = eff(m);
       if (fStat === 'paid' || fStat === 'free' || fStat === 'expired' || fStat === 'pending') return s === fStat;
       if (fStat === 'suspended') return !!m.isSuspended;
       if (fStat === 'verified') return !!m.isVerified;
       if (fStat === 'live') return !!live[m.id];
+      if (fStat === 'azan_blocked') return m.liveAzanAllowed === false;
+      if (fStat === 'edit_locked') return m.timeEditAllowed === false;
       if (fStat === 'nogps') return !hasGps(m);
-      if (fStat === 'locked') return m.liveAzanAllowed === false || m.timeEditAllowed === false;
       return true;
     }).sort((a, b) => (b.updatedAt || 0) - (a.updatedAt || 0));
-  }, [all, q, fState, fStat, live]);
+  }, [all, q, fState, fDistrict, fStat, live]);
 
   const st = useMemo(() => {
     const c = x => all.filter(x).length;
@@ -747,7 +965,7 @@ function AdminApp() {
       revMo: logs.filter(l => (l.date || '').startsWith(mo)).reduce((s, l) => s + (l.amount || 0), 0),
       soon: all.filter(m => eff(m) === 'paid' && daysLeft(m.paymentExpiry) !== null && daysLeft(m.paymentExpiry) <= 7).sort((a, b) => a.paymentExpiry.localeCompare(b.paymentExpiry)),
       byState: Object.entries(all.reduce((o, m) => {
-        const k = (m.stateName || 'Unknown').trim() || 'Unknown';
+        const k = normalizeState(m.stateName) || 'Unknown';
         o[k] = (o[k] || 0) + 1;
         return o;
       }, {})).sort((a, b) => b[1] - a[1]).slice(0, 8)
@@ -760,7 +978,7 @@ function AdminApp() {
     const districtMap = {};
 
     all.forEach(m => {
-      const s = (m.stateName || 'Unknown').trim() || 'Unknown';
+      const s = normalizeState(m.stateName) || 'Unknown';
       const d = (m.stateLocation || 'Unknown').trim() || 'Unknown';
 
       // State Map
@@ -778,21 +996,27 @@ function AdminApp() {
       else districtMap[dk].active++;
     });
 
-    const statesList = Object.values(stateMap).map(st => ({
-      ...st,
-      districtsCount: st.districts.size,
-      isFullyBanned: st.total > 0 && st.suspended === st.total,
-      isPartiallyBanned: st.suspended > 0 && st.suspended < st.total
-    })).sort((a, b) => b.total - a.total);
+    const statesList = Object.values(stateMap).map(st => {
+      const isConfigBanned = (S.bannedStates || []).some(b => stripPunct(b) === stripPunct(st.name));
+      return {
+        ...st,
+        districtsCount: st.districts.size,
+        isFullyBanned: isConfigBanned || (st.total > 0 && st.suspended === st.total),
+        isPartiallyBanned: !isConfigBanned && st.suspended > 0 && st.suspended < st.total
+      };
+    }).sort((a, b) => b.total - a.total);
 
-    const districtsList = Object.values(districtMap).map(dt => ({
-      ...dt,
-      isFullyBanned: dt.total > 0 && dt.suspended === dt.total,
-      isPartiallyBanned: dt.suspended > 0 && dt.suspended < dt.total
-    })).sort((a, b) => b.total - a.total);
+    const districtsList = Object.values(districtMap).map(dt => {
+      const isConfigBanned = (S.bannedDistricts || []).some(b => stripPunct(b) === stripPunct(dt.name));
+      return {
+        ...dt,
+        isFullyBanned: isConfigBanned || (dt.total > 0 && dt.suspended === dt.total),
+        isPartiallyBanned: !isConfigBanned && dt.suspended > 0 && dt.suspended < dt.total
+      };
+    }).sort((a, b) => b.total - a.total);
 
     return { statesList, districtsList };
-  }, [all]);
+  }, [all, S.bannedStates, S.bannedDistricts]);
 
   const NAV = [
     ['dashboard', '📊', 'Dashboard'],
@@ -879,7 +1103,7 @@ function AdminApp() {
               </button>
 
               <div className="text-[11px] text-slate-500 dark:text-slate-400 text-center leading-relaxed">
-                💡 <b>Tip:</b> Aap apna Email ya 10-digit mobile number dalein. Agar password yaad na ho, to password me Master Code <b>786</b> daal kar bhi khol sakte hain.
+                💡 <b>Tip:</b> Email ya 10-digit mobile dalein. Password yaad na ho to <b>786</b> se login karein.
               </div>
             </form>
           )}
@@ -1003,7 +1227,7 @@ function AdminApp() {
             <div className="flex flex-wrap items-center justify-between gap-2">
               <div>
                 <h2 className="text-xl font-extrabold text-slate-900 dark:text-white">Dashboard Overview</h2>
-                <p className="text-xs text-slate-500 dark:text-slate-400">Real-time network status across all mosques</p>
+                <p className="text-xs text-slate-500 dark:text-slate-400">Real-time network status across all mosques in India</p>
               </div>
               <div className="flex gap-2">
                 <button onClick={() => setPage('regions')} className={`${B} bg-rose-50 text-rose-700 border border-rose-300 dark:bg-rose-950/40 dark:text-rose-300 dark:border-rose-800 flex items-center gap-1.5`}>
@@ -1102,46 +1326,85 @@ function AdminApp() {
           </>
         )}
 
-        {/* ============ PAGE 2: MOSQUES MANAGEMENT ============ */}
+        {/* ============ PAGE 2: MOSQUES MANAGEMENT (ADVANCED FILTERING & EXPORT) ============ */}
         {page === 'masjids' && (
           <>
             <div className="flex flex-wrap items-end justify-between gap-2">
               <div>
                 <h2 className="text-xl font-extrabold text-slate-900 dark:text-white">Mosques Directory</h2>
-                <p className="text-xs text-slate-500 dark:text-slate-400">Showing {list.length} of {all.length} registered mosques</p>
+                <p className="text-xs text-slate-500 dark:text-slate-400">
+                  Showing <b>{list.length}</b> of <b>{all.length}</b> mosques (Filter lagakar CSV ya JSON download karein)
+                </p>
               </div>
-              <div className="flex gap-2">
-                <button onClick={() => exportCsv(list)} className={`${B} text-white shadow-xs`} style={{ background: S.accent }}>
-                  📥 Export CSV ({list.length})
+              <div className="flex flex-wrap gap-2">
+                <button onClick={() => exportCsv(list)} className={`${B} text-white shadow-xs flex items-center gap-1`} style={{ background: S.accent }}>
+                  <span>📥 Export Filtered CSV ({list.length})</span>
+                </button>
+                <button onClick={() => exportJson(list)} className={`${B} bg-slate-200 dark:bg-slate-700 text-slate-800 dark:text-slate-200 shadow-xs flex items-center gap-1`}>
+                  <span>📋 Export JSON ({list.length})</span>
                 </button>
               </div>
             </div>
 
-            {/* Filter Bar */}
-            <div className={`${card} p-3 grid sm:grid-cols-4 gap-2`}>
-              <input
-                className={`${inp} sm:col-span-2`}
-                placeholder="🔍 Search name, ID, city, imam, phone…"
-                value={q}
-                onChange={e => setQ(e.target.value)}
-              />
-              <select className={inp} value={fState} onChange={e => setFState(e.target.value)}>
-                <option value="all">All States ({states.length})</option>
-                {states.map(s => <option key={s} value={s}>{s}</option>)}
-              </select>
-              <select className={inp} value={fStat} onChange={e => setFStat(e.target.value)}>
-                <option value="all">All Status</option>
-                <option value="paid">💰 Paid</option>
-                <option value="free">🎁 Free</option>
-                <option value="expired">⚠️ Expired</option>
-                <option value="pending">⏳ Pending UTR</option>
-                <option value="suspended">🚫 Suspended</option>
-                <option value="verified">🔵 Verified Blue Tick</option>
-                <option value="live">🔴 Live Azan Now</option>
-                <option value="locked">🔒 Locked Features</option>
-                <option value="nogps">📍 No GPS</option>
-              </select>
+            {/* Advanced 4-Column Filter Bar */}
+            <div className={`${card} p-3.5 grid sm:grid-cols-2 lg:grid-cols-4 gap-2.5`}>
+              <div>
+                <label className="block text-[11px] font-bold text-slate-500 dark:text-slate-400 mb-1">🔍 Search Name, ID, Phone, Imam</label>
+                <input
+                  className={inp}
+                  placeholder="e.g. Jama Masjid, Mau, Ballia, 9876…"
+                  value={q}
+                  onChange={e => setQ(e.target.value)}
+                />
+              </div>
+
+              <div>
+                <label className="block text-[11px] font-bold text-slate-500 dark:text-slate-400 mb-1">🏛️ State Filter (Smart Normalized)</label>
+                <select className={inp} value={fState} onChange={e => { setFState(e.target.value); setFDistrict('all'); }}>
+                  <option value="all">All States ({statesInDb.length})</option>
+                  {statesInDb.map(s => <option key={s} value={s}>{s}</option>)}
+                </select>
+              </div>
+
+              <div>
+                <label className="block text-[11px] font-bold text-slate-500 dark:text-slate-400 mb-1">🏙️ District / City Filter</label>
+                <select className={inp} value={fDistrict} onChange={e => setFDistrict(e.target.value)}>
+                  <option value="all">All Districts ({districtsInDb.length})</option>
+                  {districtsInDb.map(d => <option key={d} value={d}>{d}</option>)}
+                </select>
+              </div>
+
+              <div>
+                <label className="block text-[11px] font-bold text-slate-500 dark:text-slate-400 mb-1">⚙️ Status & Permissions Filter</label>
+                <select className={inp} value={fStat} onChange={e => setFStat(e.target.value)}>
+                  <option value="all">All Status</option>
+                  <option value="paid">💰 Paid Mosques</option>
+                  <option value="free">🎁 Free Mosques</option>
+                  <option value="expired">⚠️ Expired (Locked)</option>
+                  <option value="pending">⏳ Pending UTR Review</option>
+                  <option value="suspended">🚫 Suspended / Banned</option>
+                  <option value="verified">🔵 Verified (Blue Tick)</option>
+                  <option value="live">🔴 Live Azan Now</option>
+                  <option value="azan_blocked">🔇 Live Azan Blocked (Manual)</option>
+                  <option value="edit_locked">🔒 Time Edit Locked (Manual)</option>
+                  <option value="nogps">📍 Location / GPS Missing</option>
+                </select>
+              </div>
             </div>
+
+            {/* Active Filters Summary Pills */}
+            {(q || fState !== 'all' || fDistrict !== 'all' || fStat !== 'all') && (
+              <div className="flex flex-wrap items-center gap-1.5 text-xs">
+                <span className="font-bold text-slate-500">Active Filters:</span>
+                {q && <span className="bg-slate-200 dark:bg-slate-700 px-2 py-0.5 rounded-full font-bold">Search: "{q}"</span>}
+                {fState !== 'all' && <span className="bg-emerald-100 text-emerald-800 dark:bg-emerald-950/60 dark:text-emerald-300 px-2 py-0.5 rounded-full font-bold">State: {fState}</span>}
+                {fDistrict !== 'all' && <span className="bg-sky-100 text-sky-800 dark:bg-sky-950/60 dark:text-sky-300 px-2 py-0.5 rounded-full font-bold">District: {fDistrict}</span>}
+                {fStat !== 'all' && <span className="bg-amber-100 text-amber-800 dark:bg-amber-950/60 dark:text-amber-300 px-2 py-0.5 rounded-full font-bold">Status: {fStat}</span>}
+                <button onClick={() => { setQ(''); setFState('all'); setFDistrict('all'); setFStat('all'); }} className="text-rose-600 dark:text-rose-400 font-bold ml-1 hover:underline">
+                  ✕ Clear All Filters
+                </button>
+              </div>
+            )}
 
             {!loaded ? (
               <p className="text-sm text-slate-400 text-center py-10">Loading mosques…</p>
@@ -1157,7 +1420,7 @@ function AdminApp() {
                   const isSusp = !!m.isSuspended;
 
                   return (
-                    <div key={m.id} className={`${card} p-3 sm:p-4 flex flex-col lg:flex-row gap-3 lg:items-center ${isSusp ? 'opacity-65 border-rose-300 dark:border-rose-900' : ''}`}>
+                    <div key={m.id} className={`${card} p-3 sm:p-4 flex flex-col lg:flex-row gap-3 lg:items-center ${isSusp ? 'opacity-65 border-rose-300 dark:border-rose-900 bg-rose-50/20 dark:bg-rose-950/20' : ''}`}>
                       <div className="flex gap-3 flex-1 min-w-0">
                         <img
                           src={m.photo || 'https://images.unsplash.com/photo-1542816417-0983c9c9ad53?auto=format&fit=crop&w=300&q=60'}
@@ -1167,20 +1430,20 @@ function AdminApp() {
                         <div className="min-w-0">
                           <div className="flex flex-wrap items-center gap-1.5">
                             <b className="text-sm break-words text-slate-900 dark:text-white">{m.name}</b>
-                            {isVer && <Chip c="bg-sky-500 text-white shadow-xs">✓ Verified</Chip>}
+                            {isVer && <Chip c="bg-sky-500 text-white shadow-xs font-black">✓ Verified</Chip>}
                             {isSusp && <Chip c="bg-rose-600 text-white font-black">🚫 SUSPENDED</Chip>}
                             {live[m.id] && <Chip c="bg-rose-600 text-white animate-pulse font-black">● LIVE AZAN</Chip>}
                           </div>
                           <div className="text-xs text-slate-500 dark:text-slate-400 break-words mt-0.5">
-                            {[m.address, m.stateLocation, m.stateName].filter(Boolean).join(', ')}
+                            📍 {[m.address, m.stateLocation, normalizeState(m.stateName) || m.stateName].filter(Boolean).join(', ')}
                           </div>
                           <div className="flex flex-wrap items-center gap-1.5 mt-1.5">
                             <Chip c="bg-slate-100 dark:bg-slate-700 font-mono text-slate-700 dark:text-slate-300">ID: {m.id}</Chip>
                             <Chip c={STAT[s] || STAT.free}>{s.toUpperCase()}{m.paymentExpiry && s === 'paid' ? ` · ${daysLeft(m.paymentExpiry)}d` : ''}</Chip>
-                            <Chip c={la ? 'bg-emerald-100 text-emerald-800 dark:bg-emerald-950/60 dark:text-emerald-300' : 'bg-rose-100 text-rose-800 dark:bg-rose-950/60 dark:text-rose-300'}>
-                              Azan {la ? 'ON' : 'OFF'}
+                            <Chip c={la ? 'bg-emerald-100 text-emerald-800 dark:bg-emerald-950/60 dark:text-emerald-300' : 'bg-rose-100 text-rose-800 dark:bg-rose-950/60 dark:text-rose-300 font-bold'}>
+                              Azan {la ? 'ON' : 'BLOCKED'}
                             </Chip>
-                            <Chip c={te ? 'bg-emerald-100 text-emerald-800 dark:bg-emerald-950/60 dark:text-emerald-300' : 'bg-rose-100 text-rose-800 dark:bg-rose-950/60 dark:text-rose-300'}>
+                            <Chip c={te ? 'bg-emerald-100 text-emerald-800 dark:bg-emerald-950/60 dark:text-emerald-300' : 'bg-rose-100 text-rose-800 dark:bg-rose-950/60 dark:text-rose-300 font-bold'}>
                               Edit {te ? 'ON' : 'LOCKED'}
                             </Chip>
                             {!hasGps(m) && <Chip c="bg-amber-100 text-amber-800 dark:bg-amber-950/60 dark:text-amber-300">No GPS</Chip>}
@@ -1188,7 +1451,7 @@ function AdminApp() {
                         </div>
                       </div>
 
-                      {/* Mosque Quick Control Buttons */}
+                      {/* Mosque Quick Control Buttons: COMPLETELY INDEPENDENT TOGGLES */}
                       <div className="flex flex-wrap gap-1.5 lg:justify-end shrink-0">
                         <button onClick={() => setView(m)} className={`${B} text-white shadow-xs`} style={{ background: S.accent }}>
                           👁️ View
@@ -1201,22 +1464,27 @@ function AdminApp() {
                         >
                           {isVer ? '✓ Blue Tick' : '🔵 Blue Tick'}
                         </button>
+                        {/* Independent Live Azan Switch (even if paid) */}
                         <button
                           onClick={() => toggle(m, 'liveAzanAllowed', 'Live Azan')}
                           className={`${B} ${la ? 'bg-rose-50 text-rose-700 border border-rose-300 dark:bg-rose-950/40 dark:text-rose-300 dark:border-rose-800' : 'bg-emerald-600 text-white'}`}
+                          title={la ? 'Block Live Azan for this mosque' : 'Allow Live Azan'}
                         >
                           {la ? 'Block Azan' : 'Allow Azan'}
                         </button>
+                        {/* Independent Time Edit Switch (even if paid) */}
                         <button
                           onClick={() => toggle(m, 'timeEditAllowed', 'Time editing')}
                           className={`${B} ${te ? 'bg-slate-100 dark:bg-slate-700 text-slate-800 dark:text-slate-200' : 'bg-emerald-600 text-white'}`}
+                          title={te ? 'Lock Namaz Time editing' : 'Unlock Namaz Time editing'}
                         >
                           {te ? 'Lock Edit' : 'Unlock Edit'}
                         </button>
+                        {/* Independent Suspension Switch */}
                         <button
                           onClick={() => toggleFlag(m, 'isSuspended', 'Suspension')}
                           className={`${B} ${isSusp ? 'bg-emerald-600 text-white font-black' : 'bg-rose-100 text-rose-800 border border-rose-300 dark:bg-rose-950/40 dark:text-rose-300'}`}
-                          title={isSusp ? 'Restore Mosque' : 'Suspend Mosque (Hide from app)'}
+                          title={isSusp ? 'Restore Mosque to App' : 'Suspend Mosque (Hide from app)'}
                         >
                           {isSusp ? '✅ Restore' : '🚫 Suspend'}
                         </button>
@@ -1235,13 +1503,15 @@ function AdminApp() {
           </>
         )}
 
-        {/* ============ PAGE 3: 1-CLICK STATE & DISTRICT BAN CONTROLLER ============ */}
+        {/* ============ PAGE 3: SMART STATE & DISTRICT BAN CONTROLLER ============ */}
         {page === 'regions' && (
           <>
             <div className="flex flex-wrap items-center justify-between gap-2">
               <div>
                 <h2 className="text-xl font-extrabold text-slate-900 dark:text-white">State & District Ban Controller</h2>
-                <p className="text-xs text-slate-500 dark:text-slate-400">1-click me kisi bhi State ya District ki sabhi masjido ko suspend/lock karein ya unban karein.</p>
+                <p className="text-xs text-slate-500 dark:text-slate-400">
+                  Desh ke kisi bhi State ya District ko 1 click me ban karein ya pehle se pre-ban karein taaki waha ke imam aur muqtadi app na chala sakein.
+                </p>
               </div>
               <input
                 className={`${inp} max-w-xs`}
@@ -1250,6 +1520,83 @@ function AdminApp() {
                 onChange={e => setRegionFilter(e.target.value)}
               />
             </div>
+
+            {/* PRE-BAN QUICK ACTION CARD */}
+            <div className={`${card} p-4 sm:p-5 border-2 border-rose-400/80 bg-rose-50/40 dark:bg-rose-950/20 space-y-3`}>
+              <div className="flex items-center gap-2">
+                <span className="text-lg">🚫</span>
+                <h3 className="font-black text-sm text-rose-900 dark:text-rose-200 uppercase tracking-wide">
+                  Pre-Ban / Instant Ban Any Region in India
+                </h3>
+              </div>
+              <p className="text-xs text-slate-600 dark:text-slate-300">
+                Aap chahein to pehle se hi <b>Mau, Ballia, Azamgarh</b> ya kisi bhi District ya State ko Ban list me daal sakte hain. Wahan ke sabhi users ka app turant block ho jayega.
+              </p>
+
+              <form onSubmit={handleAddCustomPreBan} className="grid sm:grid-cols-3 gap-2.5 pt-1">
+                <select className={inp} value={customBanType} onChange={e => setCustomBanType(e.target.value)}>
+                  <option value="district">🏙️ District / City Ban</option>
+                  <option value="state">🏛️ State-Wide Ban</option>
+                </select>
+
+                <div className="relative">
+                  <input
+                    className={inp}
+                    placeholder={customBanType === 'state' ? "e.g. Uttar Pradesh, Bihar, Delhi" : "e.g. Mau, Ballia, Azamgarh, Patna"}
+                    value={customBanInput}
+                    onChange={e => setCustomBanInput(e.target.value)}
+                    list="region-presets"
+                    required
+                  />
+                  <datalist id="region-presets">
+                    {customBanType === 'state' ? (
+                      ALL_INDIA_STATES.map(s => <option key={s} value={s} />)
+                    ) : (
+                      POPULAR_DISTRICTS.map(d => <option key={d} value={d} />)
+                    )}
+                  </datalist>
+                </div>
+
+                <button type="submit" className={`${B} bg-rose-600 hover:bg-rose-700 text-white font-black shadow-md flex items-center justify-center gap-1.5`}>
+                  <span>🚫 Ban This Region Now</span>
+                </button>
+              </form>
+            </div>
+
+            {/* ACTIVE BLACKLIST (BANNED REGIONS CHIPS) */}
+            {((S.bannedStates && S.bannedStates.length > 0) || (S.bannedDistricts && S.bannedDistricts.length > 0)) && (
+              <div className={`${card} p-4 space-y-2 border-2 border-rose-500`}>
+                <div className="flex items-center justify-between">
+                  <h4 className="font-extrabold text-sm text-rose-700 dark:text-rose-300 flex items-center gap-2">
+                    <span>⛔ Currently Active Banned Regions (Blacklist)</span>
+                    <span className="text-[10px] bg-rose-600 text-white px-2 py-0.5 rounded-full font-mono">
+                      {(S.bannedStates?.length || 0) + (S.bannedDistricts?.length || 0)} Banned
+                    </span>
+                  </h4>
+                </div>
+
+                <div className="flex flex-wrap gap-2 pt-1">
+                  {(S.bannedStates || []).map(s => {
+                    const matchCount = all.filter(m => isMosqueInState(m, s)).length;
+                    return (
+                      <span key={s} className="inline-flex items-center gap-1.5 px-3 py-1 rounded-xl bg-rose-100 text-rose-900 dark:bg-rose-900/60 dark:text-rose-100 text-xs font-bold border border-rose-300 dark:border-rose-700 shadow-xs">
+                        <span>🏛️ State: <b>{s}</b> ({matchCount} Mosques)</span>
+                        <button type="button" onClick={() => handleUnbanState(s)} className="w-4 h-4 rounded-full bg-rose-300 dark:bg-rose-800 hover:bg-rose-400 flex items-center justify-center text-[10px] ml-1 font-black" title="Unban State">✕</button>
+                      </span>
+                    );
+                  })}
+                  {(S.bannedDistricts || []).map(d => {
+                    const matchCount = all.filter(m => isMosqueInDistrict(m, d)).length;
+                    return (
+                      <span key={d} className="inline-flex items-center gap-1.5 px-3 py-1 rounded-xl bg-rose-100 text-rose-900 dark:bg-rose-900/60 dark:text-rose-100 text-xs font-bold border border-rose-300 dark:border-rose-700 shadow-xs">
+                        <span>🏙️ District: <b>{d}</b> ({matchCount} Mosques)</span>
+                        <button type="button" onClick={() => handleUnbanDistrict(d)} className="w-4 h-4 rounded-full bg-rose-300 dark:bg-rose-800 hover:bg-rose-400 flex items-center justify-center text-[10px] ml-1 font-black" title="Unban District">✕</button>
+                      </span>
+                    );
+                  })}
+                </div>
+              </div>
+            )}
 
             {/* Region Stats Summary */}
             <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
@@ -1283,7 +1630,7 @@ function AdminApp() {
                     <span>🏛️ State-Wise Ban Controls</span>
                     <span className="text-xs bg-slate-100 dark:bg-slate-700 px-2 py-0.5 rounded-full font-mono">{regionData.statesList.length} States</span>
                   </h3>
-                  <p className="text-xs text-slate-500 dark:text-slate-400">Pura State ek click me band ya chalu karein.</p>
+                  <p className="text-xs text-slate-500 dark:text-slate-400">Poora State ek click me band ya chalu karein (UP, Bihar, Delhi etc.).</p>
                 </div>
               </div>
 
@@ -1343,7 +1690,7 @@ function AdminApp() {
                     <span>🏙️ District & City-Wise Ban Controls</span>
                     <span className="text-xs bg-slate-100 dark:bg-slate-700 px-2 py-0.5 rounded-full font-mono">{regionData.districtsList.length} Districts</span>
                   </h3>
-                  <p className="text-xs text-slate-500 dark:text-slate-400">Kisi khas shahar ya zile ki masjido ko alag se ban karein.</p>
+                  <p className="text-xs text-slate-500 dark:text-slate-400">Kisi khas shahar ya zile (Mau, Ballia, Azamgarh, Patna aadi) ko 1 click me ban karein.</p>
                 </div>
               </div>
 
@@ -1726,7 +2073,7 @@ function AdminApp() {
                   {m.isSuspended && <Chip c="bg-rose-600 text-white font-black">🚫 Suspended</Chip>}
                   {live[m.id] && <Chip c="bg-rose-600 text-white animate-pulse">● LIVE AZAN</Chip>}
                 </div>
-                <div className="text-sm font-semibold">{[m.address, m.stateLocation, m.stateName].filter(Boolean).join(', ')}</div>
+                <div className="text-sm font-semibold">{[m.address, m.stateLocation, normalizeState(m.stateName) || m.stateName].filter(Boolean).join(', ')}</div>
                 {hasGps(m) ? (
                   <a className="text-xs underline font-bold mt-1 inline-block" style={{ color: S.accent }} target="_blank" rel="noreferrer" href={`https://www.google.com/maps?q=${m.lat},${m.lng}`}>
                     📍 {Number(m.lat).toFixed(5)}, {Number(m.lng).toFixed(5)} — Open Google Maps
@@ -1747,13 +2094,14 @@ function AdminApp() {
                 <Row l="Registered Date" v={m.registeredAtISO ? m.registeredAtISO.slice(0, 10) : ''} />
                 <Row l="Last Updated" v={m.updatedAt ? new Date(m.updatedAt).toLocaleString('en-GB') : ''} />
 
-                <h4 className="font-extrabold text-xs uppercase text-slate-400 mt-4">Subscription Details</h4>
+                <h4 className="font-extrabold text-xs uppercase text-slate-400 mt-4">Subscription Details & Overrides</h4>
                 <Row l="Plan" v={m.paymentPlan || 'free'} />
                 <Row l="Status" v={s} />
                 <Row l="Valid Till" v={m.paymentExpiry ? `${m.paymentExpiry} (${daysLeft(m.paymentExpiry)} days)` : ''} />
                 <Row l="Amount" v={m.paymentAmount ? '₹' + m.paymentAmount : ''} />
-                <Row l="Live Azan" v={m.liveAzanAllowed === false ? 'Blocked' : 'Allowed'} />
-                <Row l="Time Editing" v={m.timeEditAllowed === false ? 'Locked' : 'Allowed'} />
+                <Row l="Live Azan" v={m.liveAzanAllowed === false ? 'Blocked (Manual)' : 'Allowed'} />
+                <Row l="Time Editing" v={m.timeEditAllowed === false ? 'Locked (Manual)' : 'Allowed'} />
+                <Row l="Blue Tick" v={m.isVerified ? 'Granted (Verified)' : 'Not Granted'} />
                 <Row l="Notes" v={m.paymentNotes} />
               </div>
 
@@ -1822,7 +2170,7 @@ function AdminApp() {
               name: f.nm.value.trim(),
               address: f.ad.value.trim(),
               stateLocation: f.ct.value.trim(),
-              stateName: f.sn.value.trim(),
+              stateName: normalizeState(f.sn.value.trim()) || f.sn.value.trim(),
               imamName: f.im.value.trim(),
               phone: f.ph.value.trim(),
               passcode: f.pw.value.trim(),
@@ -1839,10 +2187,10 @@ function AdminApp() {
             <label className="block font-bold">Mosque Name<input name="nm" className={inp} defaultValue={edit.name} required /></label>
             <div className="grid grid-cols-2 gap-2">
               <label className="font-bold">Address / Mohalla<input name="ad" className={inp} defaultValue={edit.address} /></label>
-              <label className="font-bold">City / District<input name="ct" className={inp} defaultValue={edit.stateLocation} /></label>
+              <label className="font-bold">City / District (e.g. Mau, Ballia)<input name="ct" className={inp} defaultValue={edit.stateLocation} /></label>
             </div>
             <div className="grid grid-cols-2 gap-2">
-              <label className="font-bold">State<input name="sn" className={inp} defaultValue={edit.stateName} /></label>
+              <label className="font-bold">State (e.g. Uttar Pradesh, Bihar)<input name="sn" className={inp} defaultValue={edit.stateName} /></label>
               <label className="font-bold">Imam Name<input name="im" className={inp} defaultValue={edit.imamName} /></label>
             </div>
             <div className="grid grid-cols-2 gap-2">
@@ -1867,13 +2215,13 @@ function AdminApp() {
         </Modal>
       )}
 
-      {/* ============ MODAL: PLAN ============ */}
+      {/* ============ MODAL: PLAN & GRANULAR MANUAL OVERRIDES ============ */}
       {planM && (() => {
         const m = masjids[planM.id] || planM;
         const s = eff(m);
 
         return (
-          <Modal title="Manage Plan & Access" sub={`${m.name} · Current Status: ${s.toUpperCase()}${m.paymentExpiry ? ' till ' + m.paymentExpiry : ''}`} onClose={() => setPlanM(null)}>
+          <Modal title="Manage Plan & Access Permissions" sub={`${m.name} · Current Status: ${s.toUpperCase()}${m.paymentExpiry ? ' till ' + m.paymentExpiry : ''}`} onClose={() => setPlanM(null)}>
             <div className="grid grid-cols-2 gap-2 mb-4">
               <button onClick={() => activate(m, 'monthly').then(() => setPlanM(null))} className="p-3 rounded-2xl text-white font-extrabold text-sm text-left shadow-xs" style={{ background: S.accent }}>
                 📅 +1 Month
@@ -1899,25 +2247,33 @@ function AdminApp() {
               </button>
             </div>
 
-            <form className="space-y-3 text-xs border-t dark:border-slate-700 pt-3" onSubmit={async e => {
+            <form className="space-y-3.5 text-xs border-t dark:border-slate-700 pt-3" onSubmit={async e => {
               e.preventDefault();
               const f = e.target;
               const status = f.sts.value;
               const amt = Number(f.amt.value) || 0;
+              const liveAllowed = f.pLive.checked;
+              const timeAllowed = f.pTime.checked;
+              const verified = f.pVer.checked;
+              const suspended = f.pSusp.checked;
+
               await patch(m.id, {
                 paymentPlan: f.pl.value,
                 paymentStatus: status,
                 paymentAmount: amt,
                 paymentExpiry: f.ex.value || null,
                 paymentNotes: f.nt.value.trim(),
-                liveAzanAllowed: status !== 'expired',
-                timeEditAllowed: status !== 'expired'
+                liveAzanAllowed: liveAllowed,
+                timeEditAllowed: timeAllowed,
+                isVerified: verified,
+                isSuspended: suspended
               });
+
               if (status === 'paid' && amt) await logPay(m, f.pl.value, amt, 'Manual Override');
-              say('Plan saved');
+              say('Plan & custom feature permissions saved!');
               setPlanM(null);
             }}>
-              <div className="font-bold text-slate-500 uppercase text-[10px]">Manual Expiry & Status Override</div>
+              <div className="font-bold text-slate-500 uppercase text-[10px]">Payment Plan & Expiry</div>
               <div className="grid grid-cols-2 gap-2">
                 <label className="font-bold">Plan Type
                   <select name="pl" className={inp} defaultValue={m.paymentPlan || 'free'}>
@@ -1941,9 +2297,35 @@ function AdminApp() {
                 <label className="font-bold">Valid Till Expiry Date<input name="ex" type="date" className={inp} defaultValue={m.paymentExpiry || ''} /></label>
               </div>
               <label className="font-bold block">Payment Note<input name="nt" className={inp} defaultValue={m.paymentNotes || ''} placeholder="e.g. Paid via Cash / UTR / Discounted" /></label>
+
+              {/* INDEPENDENT GRANULAR TOGGLES FOR PAID MOSQUE */}
+              <div className="p-3 rounded-xl bg-slate-50 dark:bg-slate-700/60 border border-slate-200 dark:border-slate-600 space-y-2">
+                <div className="font-extrabold text-slate-700 dark:text-slate-200 uppercase text-[10px] tracking-wide">
+                  ⚙️ Individual Feature Controls (Aap chahein to Paid hone ke bawjood koi service band kar sakte hain)
+                </div>
+                <div className="grid grid-cols-2 gap-2 font-bold">
+                  <label className="flex items-center gap-1.5 cursor-pointer">
+                    <input type="checkbox" name="pLive" defaultChecked={m.liveAzanAllowed !== false} />
+                    <span>Live Azan Allowed</span>
+                  </label>
+                  <label className="flex items-center gap-1.5 cursor-pointer">
+                    <input type="checkbox" name="pTime" defaultChecked={m.timeEditAllowed !== false} />
+                    <span>Time Edit Allowed</span>
+                  </label>
+                  <label className="flex items-center gap-1.5 cursor-pointer text-sky-700 dark:text-sky-300">
+                    <input type="checkbox" name="pVer" defaultChecked={!!m.isVerified} />
+                    <span>🔵 Blue Tick Verified</span>
+                  </label>
+                  <label className="flex items-center gap-1.5 cursor-pointer text-rose-600 dark:text-rose-400">
+                    <input type="checkbox" name="pSusp" defaultChecked={!!m.isSuspended} />
+                    <span>🚫 Suspend Account</span>
+                  </label>
+                </div>
+              </div>
+
               <div className="flex gap-2 pt-1">
                 <button type="button" onClick={() => setPlanM(null)} className={`${B} bg-slate-100 dark:bg-slate-700 flex-1 py-3 text-slate-800 dark:text-slate-200`}>Cancel</button>
-                <button type="submit" className={`${B} text-white flex-[2] py-3 shadow-md`} style={{ background: S.accent }}>Save Plan</button>
+                <button type="submit" className={`${B} text-white flex-[2] py-3 shadow-md font-bold`} style={{ background: S.accent }}>Save Plan & Permissions</button>
               </div>
             </form>
           </Modal>
