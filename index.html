@@ -390,6 +390,8 @@
         whatsapp: '918084329613', // Admin WhatsApp: 8084329613
         email: '',           // jaise: 'you@gmail.com'
         qrPhoto: '',          // optional: apne QR ki photo ka data-URL ya link
+        allMasjidsPaidMode: false, // agar true ho to bina payment/approval sabhi masjids ke profile buttons locked rahenge
+        premiumFeeAmount: 499,
         supportMessage: 'यह ऐप अल्हम्दुलिल्लाह सभी मस्जिदों और मुक़्तदियों के लिए 100% मुफ़्त है। सर्वर, डेटाबेस व मैसेजिंग का मासिक खर्च चलाने में आप अपनी मर्जी से छोटा सहयोग दे सकते हैं।'
       };
       const ADMIN_SUPPORT = DEFAULT_ADMIN_SUPPORT;
@@ -733,6 +735,7 @@
         const [showNewNoticeModal, setShowNewNoticeModal] = useState(false);
         const [showPremiumPaywallModal, setShowPremiumPaywallModal] = useState(false);
         const [paywallTargetMasjid, setPaywallTargetMasjid] = useState(null);
+        const [paywallTargetService, setPaywallTargetService] = useState(null); // 'profileServices' | 'liveAzan' | 'blueTick' | null
         const [paymentUtrInput, setPaymentUtrInput] = useState('');
         const [paymentDateTimeInput, setPaymentDateTimeInput] = useState('');
         // Forms & Inputs
@@ -762,6 +765,7 @@
         const [passwordResetRequests, setPasswordResetRequests] = useState(() => {
           try { return JSON.parse(safeStorageGet('mc_pwd_resets', '[]')); } catch(e) { return []; }
         });
+        const [resetSuccessNotice, setResetSuccessNotice] = useState(null);
         const [newNoticeTitle, setNewNoticeTitle] = useState('');
         const [newNoticeMessage, setNewNoticeMessage] = useState('');
         const [isRefreshing, setIsRefreshing] = useState(false);
@@ -1327,9 +1331,54 @@
           return true;
         };
 
-        const openPremiumPaywallModal = (m = null) => {
+        // 3 Distinct Service Categories per Masjid:
+        // 1. Blue Tick (Verified Badge)
+        const isBlueTickActive = (m) => {
+          if (!m) return false;
+          if (m.isSuspended || checkIsRegionBanned(m)) return false;
+          if (m.services && typeof m.services.blueTick === 'boolean') return m.services.blueTick;
+          if (typeof m.blueTickAllowed === 'boolean') return m.blueTickAllowed;
+          if (typeof m.blueTick === 'boolean') return m.blueTick;
+          const isPaidAll = !!adminSupport?.allMasjidsPaidMode;
+          if (isPaidAll) {
+            return (m.paymentStatus === 'free' || checkIsMasjidPremiumActive(m)) && !!m.isVerified;
+          }
+          return !!m.isVerified;
+        };
+
+        // 2. Live Azan Service (Audio Broadcast & Streaming)
+        const isLiveAzanServiceActive = (m) => {
+          if (!m) return false;
+          if (m.isSuspended || checkIsRegionBanned(m)) return false;
+          if (m.services && typeof m.services.liveAzan === 'boolean') return m.services.liveAzan;
+          if (typeof m.liveAzanAllowed === 'boolean' && !m.liveAzanAllowed) return false;
+          if (typeof m.liveAzan === 'boolean') return m.liveAzan;
+          const isPaidAll = !!adminSupport?.allMasjidsPaidMode;
+          if (isPaidAll) {
+            return m.paymentStatus === 'free' || checkIsMasjidPremiumActive(m);
+          }
+          return m.liveAzanAllowed !== false && checkIsMasjidPremiumActive(m);
+        };
+
+        // 3. Profile ki saari services (Namaz Times, Hadith, Notice, Sehri/Iftar, Info, Profile edit/delete)
+        const isProfileServicesActive = (m) => {
+          if (!m) return false;
+          if (m.isSuspended || checkIsRegionBanned(m)) return false;
+          if (m.services && typeof m.services.profileServices === 'boolean') return m.services.profileServices;
+          if (typeof m.profileServicesAllowed === 'boolean') return m.profileServicesAllowed;
+          if (typeof m.profileServices === 'boolean') return m.profileServices;
+          if (m.timeEditAllowed === false) return false;
+          const isPaidAll = !!adminSupport?.allMasjidsPaidMode;
+          if (isPaidAll) {
+            return m.paymentStatus === 'free' || checkIsMasjidPremiumActive(m);
+          }
+          return m.timeEditAllowed !== false && checkIsMasjidPremiumActive(m);
+        };
+
+        const openPremiumPaywallModal = (m = null, serviceType = null) => {
           const target = m || loggedImamMasjid || masjids[loggedImamMasjidId];
           setPaywallTargetMasjid(target);
+          setPaywallTargetService(serviceType || null);
           setPaymentUtrInput('');
           setPaymentDateTimeInput(new Date().toLocaleString('hi-IN', { day: 'numeric', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' }));
           setShowPremiumPaywallModal(true);
@@ -1354,6 +1403,7 @@
             date: cleanDate,
             amount: currentPremFee,
             plan: 'yearly',
+            requestedService: paywallTargetService || 'all',
             status: 'pending',
             timestamp: Date.now()
           };
@@ -1365,6 +1415,7 @@
                 paymentStatus: 'pending',
                 pendingUtr: cleanUtr,
                 pendingPaymentDate: cleanDate,
+                pendingService: paywallTargetService || 'all',
                 updatedAt: Date.now()
               }, { merge: true }).catch(() => {});
             } catch(e) {}
@@ -1386,12 +1437,8 @@
             showToast('🚫 आपका क्षेत्र या मस्जिद व्यवस्थापक द्वारा प्रतिबंधित (Banned / Suspended) है।', 'error');
             return;
           }
-          if (m && m.liveAzanAllowed === false) {
-            showToast('⚠️ व्यवस्थापक ने आपकी मस्जिद के लिए लाइव अज़ान सुविधा रोक रखी है।', 'error');
-            return;
-          }
-          if (!checkIsMasjidPremiumActive(m)) {
-            openPremiumPaywallModal(m);
+          if (!isLiveAzanServiceActive(m)) {
+            openPremiumPaywallModal(m, 'liveAzan');
             return;
           }
           azanStreamer.initContext(); const res = await azanStreamer.startBroadcast(masjidId);
@@ -1464,8 +1511,17 @@
 
         const infoMasjid = infoMasjidId ? masjids[infoMasjidId] : null;
         const openMasjidInfo = (id, from) => { setInfoMasjidId(id); setInfoBackTab(from || 'home'); setCurrentTab('info'); };
-        const copyText = (txt) => { try { navigator.clipboard.writeText(txt); showToast('✅ कॉपी हो गया'); } catch (e) { showToast('कॉपी नहीं हो सका', 'error'); } };
-        const openInfoEdit = () => { const m = masjids[loggedImamMasjidId]; if (!m) return; const inf = m.info || {}; setInfoDraft({ ...inf, facilities: [...(inf.facilities || [])] }); setShowInfoEditModal(true); };
+        const openInfoEdit = () => {
+          const m = masjids[loggedImamMasjidId];
+          if (!m) return;
+          if (!isProfileServicesActive(m)) {
+            openPremiumPaywallModal(m, 'profileServices');
+            return;
+          }
+          const inf = m.info || {};
+          setInfoDraft({ ...inf, facilities: [...(inf.facilities || [])] });
+          setShowInfoEditModal(true);
+        };
         const setD = (k, v) => setInfoDraft(prev => ({ ...prev, [k]: v }));
         const toggleFacility = (f) => setInfoDraft(prev => { const cur = prev.facilities || []; return { ...prev, facilities: cur.includes(f) ? cur.filter(x => x !== f) : [...cur, f] }; });
         const handleQrUpload = (e) => {
@@ -1535,6 +1591,10 @@
 
         const openRamzanEdit = () => {
           const m = masjids[loggedImamMasjidId]; if (!m) return;
+          if (!isProfileServicesActive(m)) {
+            openPremiumPaywallModal(m, 'profileServices');
+            return;
+          }
           const sch = normSchedule(m.schedule);
           const rz = m.ramzan || {};
           const todayStr = new Date().toISOString().slice(0, 10);
@@ -1709,12 +1769,8 @@
             showToast('🚫 आपका क्षेत्र या मस्जिद व्यवस्थापक द्वारा प्रतिबंधित (Banned / Suspended) है।', 'error');
             return;
           }
-          if (m.timeEditAllowed === false) {
-            showToast('⚠️ व्यवस्थापक ने औक़ात बदलने की सुविधा रोक रखी है।', 'error');
-            return;
-          }
-          if (!checkIsMasjidPremiumActive(m)) {
-            openPremiumPaywallModal(m);
+          if (!isProfileServicesActive(m)) {
+            openPremiumPaywallModal(m, 'profileServices');
             return;
           }
           setEditSchedule(normSchedule(m.schedule));
@@ -1778,6 +1834,38 @@
 
         const handleSendResetRequest = (m) => {
           if (!m) return;
+
+          // 0. Banned Mosque Check
+          const isMosqueBanned = Boolean(m.isBanned || m.isSuspended || (typeof checkIsRegionBanned === 'function' && checkIsRegionBanned(m)));
+          if (isMosqueBanned) {
+            showToast('⚠️ सुरक्षा कारणों से यह मस्जिद आईडी अस्थायी रूप से लॉक है। एडमिन से संपर्क करें।', 'error');
+            return;
+          }
+
+          // Rate Limiting Check: Max 3 requests per 24 hours per masjid
+          const now = Date.now();
+          const oneDayAgo = now - 24 * 60 * 60 * 1000;
+          const userResetHistoryKey = `mc_reset_log_${m.id}`;
+          let history = [];
+          try {
+            history = JSON.parse(safeStorageGet(userResetHistoryKey, '[]')).filter(ts => ts > oneDayAgo);
+          } catch (e) { history = []; }
+
+          if (history.length >= 3) {
+            showToast('⛔ आज के लिए आपकी 3 रिक्वेस्ट पूरी हो चुकी हैं। कृपया 24 घंटे बाद कोशिश करें।', 'error');
+            return;
+          }
+
+          // Save new timestamp in history
+          history.push(now);
+          safeStorageSet(userResetHistoryKey, JSON.stringify(history));
+
+          // 1. LOGIN FORM AUTO-FILL & SCREEN TRANSITION
+          setLoginMasjidId(m.id);
+          setShowForgotCredentialsModal(false);
+          setCurrentTab('profile');
+
+          // 2. ADMIN KO REALTIME NOTIFICATION (Firestore + MQTT)
           const reqItem = {
             id: 'req_' + Date.now(),
             masjidId: m.id,
@@ -1804,10 +1892,13 @@
             }
           } catch (e) {}
 
-          const adminNum = '918084329613';
-          const msg = `अस्सलाम वालेकुम एडमिन साहब, मुझे मस्जिद [${m.name}] (ID: ${m.id}) का पासवर्ड रीसेट करवाना है। रजिस्टर्ड मोबाइल नंबर: ${m.phone}। कृपया मेरा पासवर्ड भेजें।`;
-          openNativeWhatsApp(adminNum, msg);
-          showToast('✅ पासवर्ड रीसेट का अनुरोध WhatsApp पर तैयार है!');
+          // 3. SHOW CONFIRMATION NOTICE (2-3 Minute WhatsApp Delivery)
+          setResetSuccessNotice({
+            masjidName: m.name,
+            masjidId: m.id,
+            phone: m.phone
+          });
+          showToast(`✅ अनुरोध प्राप्त हुआ! 2-3 मिनट में पासवर्ड भेज दिया जाएगा।`);
         };
 
         const handleRefresh = () => {
@@ -1939,7 +2030,7 @@
                     <div className="flex items-center gap-1.5 flex-wrap">
                       <h1 className="font-masjid text-xl sm:text-2xl font-black uppercase text-amber-300 tracking-wide truncate drop-shadow-sm leading-tight flex items-center gap-1.5">
                         <span className="truncate">{currentMasjid.name}</span>
-                        {currentMasjid.isVerified && <VerifiedBadge size="lg" />}
+                        {isBlueTickActive(currentMasjid) && <VerifiedBadge size="lg" />}
                       </h1>
                       <button
                         type="button"
@@ -2103,7 +2194,7 @@
                                 <div className="flex-1 min-w-0">
                                   <div className="flex items-center gap-1.5 flex-wrap">
                                     <h4 className="font-black text-[15px] leading-tight break-words">{m.name}</h4>
-                                    {m.isVerified && <VerifiedBadge size="sm" />}
+                                    {isBlueTickActive(m) && <VerifiedBadge size="sm" />}
                                   </div>
                                   <p className="text-[11px] text-slate-500 mt-0.5 leading-snug break-words">📍 {m.address}</p>
                                   {m.distanceText && (
@@ -2381,7 +2472,7 @@
                         <div className="flex-1 min-w-0">
                           <div className="flex items-center gap-1.5 flex-wrap">
                             <h4 className="font-black text-[15px] leading-tight break-words">{m.name}</h4>
-                            {m.isVerified && <VerifiedBadge size="sm" />}
+                            {isBlueTickActive(m) && <VerifiedBadge size="sm" />}
                           </div>
                           <p className="text-[11px] text-slate-500 leading-snug break-words mt-0.5">{m.address}</p>
                           {m.distanceText ? (
@@ -2413,7 +2504,7 @@
                           <div className="flex-1 min-w-0">
                             <div className="flex items-center gap-1.5 flex-wrap">
                               <h4 className="font-black text-sm leading-tight break-words">{m.name}</h4>
-                              {m.isVerified && <VerifiedBadge size="sm" />}
+                              {isBlueTickActive(m) && <VerifiedBadge size="sm" />}
                             </div>
                             <p className="text-[11px] text-slate-500 leading-snug break-words mt-0.5">{m.address}</p>
                             {m.hasValidLocation && m.distanceText ? (
@@ -2459,7 +2550,19 @@
                         <div className="min-w-0">
                           <div className="flex items-center gap-1.5 flex-wrap">
                             <span className="text-xs font-black tracking-wide text-amber-300">Live Followers</span>
-                            {loggedImamMasjid.isVerified && <VerifiedBadge size="sm" />}
+                            {isBlueTickActive(loggedImamMasjid) ? (
+                              <VerifiedBadge size="sm" />
+                            ) : (
+                              <button
+                                type="button"
+                                onClick={() => openPremiumPaywallModal(loggedImamMasjid, 'blueTick')}
+                                className="inline-flex items-center gap-1 bg-amber-500/20 hover:bg-amber-500/30 text-amber-200 text-[9px] px-2 py-0.5 rounded-full font-bold border border-amber-400/40 cursor-pointer active:scale-95 transition"
+                                title="ब्लू टिक अनलॉक करने के लिए क्लिक करें"
+                              >
+                                <span>🔵</span>
+                                <span>ब्लू टिक 🔒</span>
+                              </button>
+                            )}
                             <span className="inline-flex items-center gap-1 bg-emerald-500/30 text-emerald-300 text-[8.5px] px-1.5 py-0.5 rounded-full font-black border border-emerald-400/30">
                               <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-ping"></span>
                               LIVE
@@ -2478,55 +2581,121 @@
                       </div>
                     </div>
 
+                    {/* LOCK NOTICE BANNER IF PROFILE SERVICES ARE LOCKED */}
+                    {!isProfileServicesActive(loggedImamMasjid) && (
+                      <div 
+                        onClick={() => openPremiumPaywallModal(loggedImamMasjid, 'profileServices')}
+                        className="p-2.5 rounded-2xl bg-amber-500/15 border border-amber-400/60 hover:bg-amber-500/25 text-amber-900 dark:text-amber-200 flex items-center justify-between text-xs font-bold shadow-xs cursor-pointer active:scale-[0.99] transition shrink-0"
+                      >
+                        <div className="flex items-center gap-2">
+                          <span className="text-base">🔒</span>
+                          <div className="text-left">
+                            <span className="block font-black text-amber-950 dark:text-amber-100 text-[11.5px]">प्रोफ़ाइल सेवाएं लॉक हैं (Paid Service)</span>
+                            <span className="block text-[10px] text-amber-800 dark:text-amber-300 font-medium">Namaz Time, Hadith व सभी बटन चालू करने के लिए अनलॉक करें</span>
+                          </div>
+                        </div>
+                        <span className="px-2.5 py-1 rounded-xl bg-gradient-to-r from-amber-500 to-amber-600 text-slate-950 font-black text-[11px] shadow-xs shrink-0">
+                          अनलॉक 💳
+                        </span>
+                      </div>
+                    )}
+
                     {/* WHITE CONTAINER: 2-COLUMN GRID OF 8 COMPACT MOBILE ACTION BUTTONS (NO ICONS) */}
                     <div className={`${darkMode ? 'bg-slate-800 border-slate-700' : 'bg-white border-slate-200'} p-3 rounded-2xl shadow-sm border shrink-0`}>
                       <div className="grid grid-cols-2 gap-2">
                         {/* Row 1: Namaz Time, Hadith */}
                         <button
                           type="button"
-                          onClick={() => openEditTimeModal(loggedImamMasjid)}
-                          className="py-2.5 px-2 rounded-xl bg-[#eaf5ed] hover:bg-[#d8eedf] active:bg-[#cbe6d4] dark:bg-emerald-950/40 dark:hover:bg-emerald-900/50 border border-emerald-200 dark:border-emerald-800/70 flex items-center justify-center text-center text-[#07382c] dark:text-emerald-200 font-bold text-xs sm:text-[13px] shadow-xs active:scale-95 transition min-h-[38px]"
+                          onClick={() => {
+                            if (!isProfileServicesActive(loggedImamMasjid)) {
+                              openPremiumPaywallModal(loggedImamMasjid, 'profileServices');
+                              return;
+                            }
+                            openEditTimeModal(loggedImamMasjid);
+                          }}
+                          className="py-2.5 px-2 rounded-xl bg-[#eaf5ed] hover:bg-[#d8eedf] active:bg-[#cbe6d4] dark:bg-emerald-950/40 dark:hover:bg-emerald-900/50 border border-emerald-200 dark:border-emerald-800/70 flex items-center justify-center gap-1 text-center text-[#07382c] dark:text-emerald-200 font-bold text-xs sm:text-[13px] shadow-xs active:scale-95 transition min-h-[38px]"
                         >
                           <span>Namaz Time</span>
+                          {!isProfileServicesActive(loggedImamMasjid) && <span className="text-[10px] text-amber-600 dark:text-amber-400 font-bold">🔒</span>}
                         </button>
                         <button
                           type="button"
-                          onClick={() => { setEditHadithText(loggedImamMasjid.dailyHadith || ''); setEditHadithRef(loggedImamMasjid.dailyHadithRef || ''); setShowEditHadithModal(true); }}
-                          className="py-2.5 px-2 rounded-xl bg-[#eaf5ed] hover:bg-[#d8eedf] active:bg-[#cbe6d4] dark:bg-emerald-950/40 dark:hover:bg-emerald-900/50 border border-emerald-200 dark:border-emerald-800/70 flex items-center justify-center text-center text-[#07382c] dark:text-emerald-200 font-bold text-xs sm:text-[13px] shadow-xs active:scale-95 transition min-h-[38px]"
+                          onClick={() => {
+                            if (!isProfileServicesActive(loggedImamMasjid)) {
+                              openPremiumPaywallModal(loggedImamMasjid, 'profileServices');
+                              return;
+                            }
+                            setEditHadithText(loggedImamMasjid.dailyHadith || '');
+                            setEditHadithRef(loggedImamMasjid.dailyHadithRef || '');
+                            setShowEditHadithModal(true);
+                          }}
+                          className="py-2.5 px-2 rounded-xl bg-[#eaf5ed] hover:bg-[#d8eedf] active:bg-[#cbe6d4] dark:bg-emerald-950/40 dark:hover:bg-emerald-900/50 border border-emerald-200 dark:border-emerald-800/70 flex items-center justify-center gap-1 text-center text-[#07382c] dark:text-emerald-200 font-bold text-xs sm:text-[13px] shadow-xs active:scale-95 transition min-h-[38px]"
                         >
                           <span>Hadith</span>
+                          {!isProfileServicesActive(loggedImamMasjid) && <span className="text-[10px] text-amber-600 dark:text-amber-400 font-bold">🔒</span>}
                         </button>
 
                         {/* Row 2: Sehri / Iftar, Notice */}
                         <button
                           type="button"
-                          onClick={openRamzanEdit}
-                          className="py-2.5 px-2 rounded-xl bg-[#eaf5ed] hover:bg-[#d8eedf] active:bg-[#cbe6d4] dark:bg-emerald-950/40 dark:hover:bg-emerald-900/50 border border-emerald-200 dark:border-emerald-800/70 flex items-center justify-center text-center text-[#07382c] dark:text-emerald-200 font-bold text-xs sm:text-[13px] shadow-xs active:scale-95 transition min-h-[38px]"
+                          onClick={() => {
+                            if (!isProfileServicesActive(loggedImamMasjid)) {
+                              openPremiumPaywallModal(loggedImamMasjid, 'profileServices');
+                              return;
+                            }
+                            openRamzanEdit();
+                          }}
+                          className="py-2.5 px-2 rounded-xl bg-[#eaf5ed] hover:bg-[#d8eedf] active:bg-[#cbe6d4] dark:bg-emerald-950/40 dark:hover:bg-emerald-900/50 border border-emerald-200 dark:border-emerald-800/70 flex items-center justify-center gap-1 text-center text-[#07382c] dark:text-emerald-200 font-bold text-xs sm:text-[13px] shadow-xs active:scale-95 transition min-h-[38px]"
                         >
                           <span>Sehri / Iftar</span>
+                          {!isProfileServicesActive(loggedImamMasjid) && <span className="text-[10px] text-amber-600 dark:text-amber-400 font-bold">🔒</span>}
                         </button>
                         <button
                           type="button"
-                          onClick={() => setShowNewNoticeModal(true)}
-                          className="py-2.5 px-2 rounded-xl bg-[#eaf5ed] hover:bg-[#d8eedf] active:bg-[#cbe6d4] dark:bg-emerald-950/40 dark:hover:bg-emerald-900/50 border border-emerald-200 dark:border-emerald-800/70 flex items-center justify-center text-center text-[#07382c] dark:text-emerald-200 font-bold text-xs sm:text-[13px] shadow-xs active:scale-95 transition min-h-[38px]"
+                          onClick={() => {
+                            if (!isProfileServicesActive(loggedImamMasjid)) {
+                              openPremiumPaywallModal(loggedImamMasjid, 'profileServices');
+                              return;
+                            }
+                            setShowNewNoticeModal(true);
+                          }}
+                          className="py-2.5 px-2 rounded-xl bg-[#eaf5ed] hover:bg-[#d8eedf] active:bg-[#cbe6d4] dark:bg-emerald-950/40 dark:hover:bg-emerald-900/50 border border-emerald-200 dark:border-emerald-800/70 flex items-center justify-center gap-1 text-center text-[#07382c] dark:text-emerald-200 font-bold text-xs sm:text-[13px] shadow-xs active:scale-95 transition min-h-[38px]"
                         >
                           <span>Notice</span>
+                          {!isProfileServicesActive(loggedImamMasjid) && <span className="text-[10px] text-amber-600 dark:text-amber-400 font-bold">🔒</span>}
                         </button>
 
                         {/* Row 3: About Masjid, Edit Profile */}
                         <button
                           type="button"
-                          onClick={openInfoEdit}
-                          className="py-2.5 px-2 rounded-xl bg-[#eaf5ed] hover:bg-[#d8eedf] active:bg-[#cbe6d4] dark:bg-emerald-950/40 dark:hover:bg-emerald-900/50 border border-emerald-200 dark:border-emerald-800/70 flex items-center justify-center text-center text-[#07382c] dark:text-emerald-200 font-bold text-xs sm:text-[13px] shadow-xs active:scale-95 transition min-h-[38px]"
+                          onClick={() => {
+                            if (!isProfileServicesActive(loggedImamMasjid)) {
+                              openPremiumPaywallModal(loggedImamMasjid, 'profileServices');
+                              return;
+                            }
+                            openInfoEdit();
+                          }}
+                          className="py-2.5 px-2 rounded-xl bg-[#eaf5ed] hover:bg-[#d8eedf] active:bg-[#cbe6d4] dark:bg-emerald-950/40 dark:hover:bg-emerald-900/50 border border-emerald-200 dark:border-emerald-800/70 flex items-center justify-center gap-1 text-center text-[#07382c] dark:text-emerald-200 font-bold text-xs sm:text-[13px] shadow-xs active:scale-95 transition min-h-[38px]"
                         >
                           <span>About Masjid</span>
+                          {!isProfileServicesActive(loggedImamMasjid) && <span className="text-[10px] text-amber-600 dark:text-amber-400 font-bold">🔒</span>}
                         </button>
                         <button
                           type="button"
-                          onClick={() => { setEditPhotoUrl(loggedImamMasjid.photo); setEditLat(parseFloat(loggedImamMasjid.lat) || 28.6139); setEditLng(parseFloat(loggedImamMasjid.lng) || 77.2090); setShowEditProfileModal(true); }}
-                          className="py-2.5 px-2 rounded-xl bg-[#eaf5ed] hover:bg-[#d8eedf] active:bg-[#cbe6d4] dark:bg-emerald-950/40 dark:hover:bg-emerald-900/50 border border-emerald-200 dark:border-emerald-800/70 flex items-center justify-center text-center text-[#07382c] dark:text-emerald-200 font-bold text-xs sm:text-[13px] shadow-xs active:scale-95 transition min-h-[38px]"
+                          onClick={() => {
+                            if (!isProfileServicesActive(loggedImamMasjid)) {
+                              openPremiumPaywallModal(loggedImamMasjid, 'profileServices');
+                              return;
+                            }
+                            setEditPhotoUrl(loggedImamMasjid.photo);
+                            setEditLat(parseFloat(loggedImamMasjid.lat) || 28.6139);
+                            setEditLng(parseFloat(loggedImamMasjid.lng) || 77.2090);
+                            setShowEditProfileModal(true);
+                          }}
+                          className="py-2.5 px-2 rounded-xl bg-[#eaf5ed] hover:bg-[#d8eedf] active:bg-[#cbe6d4] dark:bg-emerald-950/40 dark:hover:bg-emerald-900/50 border border-emerald-200 dark:border-emerald-800/70 flex items-center justify-center gap-1 text-center text-[#07382c] dark:text-emerald-200 font-bold text-xs sm:text-[13px] shadow-xs active:scale-95 transition min-h-[38px]"
                         >
                           <span>Edit Profile</span>
+                          {!isProfileServicesActive(loggedImamMasjid) && <span className="text-[10px] text-amber-600 dark:text-amber-400 font-bold">🔒</span>}
                         </button>
 
                         {/* Row 4: Logout, Delete Profile */}
@@ -2539,10 +2708,18 @@
                         </button>
                         <button
                           type="button"
-                          onClick={() => { setDeletePasswordInput(''); setShowDeleteSafetyModal(true); }}
-                          className="py-2.5 px-2 rounded-xl bg-[#eaf5ed] hover:bg-rose-50 active:bg-rose-100 dark:bg-emerald-950/40 dark:hover:bg-rose-950/40 border border-emerald-200 dark:border-emerald-800/70 hover:border-rose-300 dark:hover:border-rose-800 flex items-center justify-center text-center text-[#07382c] dark:text-emerald-200 hover:text-rose-700 dark:hover:text-rose-400 font-bold text-xs sm:text-[13px] shadow-xs active:scale-95 transition min-h-[38px]"
+                          onClick={() => {
+                            if (!isProfileServicesActive(loggedImamMasjid)) {
+                              openPremiumPaywallModal(loggedImamMasjid, 'profileServices');
+                              return;
+                            }
+                            setDeletePasswordInput('');
+                            setShowDeleteSafetyModal(true);
+                          }}
+                          className="py-2.5 px-2 rounded-xl bg-[#eaf5ed] hover:bg-rose-50 active:bg-rose-100 dark:bg-emerald-950/40 dark:hover:bg-rose-950/40 border border-emerald-200 dark:border-emerald-800/70 hover:border-rose-300 dark:hover:border-rose-800 flex items-center justify-center gap-1 text-center text-[#07382c] dark:text-emerald-200 hover:text-rose-700 dark:hover:text-rose-400 font-bold text-xs sm:text-[13px] shadow-xs active:scale-95 transition min-h-[38px]"
                         >
                           <span>Delete Profile</span>
+                          {!isProfileServicesActive(loggedImamMasjid) && <span className="text-[10px] text-amber-600 dark:text-amber-400 font-bold">🔒</span>}
                         </button>
                       </div>
                     </div>
@@ -2555,6 +2732,10 @@
                           if (isImamLive) {
                             handleStopLiveAzan(loggedImamMasjid.id);
                           } else {
+                            if (!isLiveAzanServiceActive(loggedImamMasjid)) {
+                              openPremiumPaywallModal(loggedImamMasjid, 'liveAzan');
+                              return;
+                            }
                             handleStartLiveAzan(loggedImamMasjid.id);
                           }
                         }}
@@ -2570,7 +2751,7 @@
                           <span className="text-base">))</span>
                         </div>
                         <span className="text-[11px] font-black tracking-wide leading-tight text-center px-2">
-                          {isImamLive ? 'Stop Live Azan' : 'Start Live Azan'}
+                          {isImamLive ? 'Stop Live Azan' : (!isLiveAzanServiceActive(loggedImamMasjid) ? 'Live Azan 🔒 (Unlock)' : 'Start Live Azan')}
                         </span>
                       </button>
                     </div>
@@ -2647,7 +2828,7 @@
                         <img src={m.photo || 'https://images.unsplash.com/photo-1542816417-0983c9c9ad53?auto=format&fit=crop&w=800&q=80'} alt={m.name} className="w-[88px] h-[88px] rounded-full object-cover border-[3px] border-amber-400 shadow" />
                         <h2 className="font-masjid text-2xl leading-tight text-[#07382c] dark:text-emerald-300 break-words flex items-center justify-center gap-1.5 flex-wrap">
                           <span>{m.name}</span>
-                          {m.isVerified && <VerifiedBadge size="lg" />}
+                          {isBlueTickActive(m) && <VerifiedBadge size="lg" />}
                         </h2>
                         <p className="text-[12px] text-slate-500 break-words">📍 {m.address}{m.stateLocation ? `, ${m.stateLocation}` : ''}{m.stateName ? `, ${m.stateName}` : ''}</p>
                         {(m.imamName || m.phone) && <div className="w-full h-px bg-slate-200 dark:bg-slate-700 my-1.5"></div>}
@@ -2819,7 +3000,7 @@
                       {m && (
                         <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-800 dark:bg-emerald-950/60 dark:text-emerald-300 max-w-[150px] truncate shrink-0 inline-flex items-center gap-1">
                           <span className="truncate">{m.name}</span>
-                          {m.isVerified && <VerifiedBadge size="xs" />}
+                          {isBlueTickActive(m) && <VerifiedBadge size="xs" />}
                         </span>
                       )}
                     </div>
@@ -3332,45 +3513,77 @@
                     <button onClick={() => { setShowForgotCredentialsModal(false); setForgotPhoneInput(''); }} className="w-7 h-7 rounded-full bg-slate-100 dark:bg-slate-700 flex items-center justify-center text-slate-500 font-bold">✕</button>
                   </div>
 
-                  <div className="space-y-3 text-xs">
+                  <form onSubmit={(e) => { e.preventDefault(); }} className="space-y-3 text-xs">
                     <div>
                       <label className="font-extrabold block mb-1 text-slate-700 dark:text-slate-200">
-                        📱 अपना रजिस्टर्ड 10 अंकों का मोबाइल नंबर डालें:
+                        📱 अपना 10 अंकों का मोबाइल नंबर या मस्जिद ID डालें:
                       </label>
-                      <input 
-                        type="tel" 
-                        maxLength="10" 
-                        value={forgotPhoneInput} 
-                        onChange={(e) => setForgotPhoneInput(e.target.value.replace(/[^0-9]/g, ''))} 
-                        placeholder="उदा: 9876543210" 
-                        className="w-full p-2.5 border rounded-xl dark:bg-slate-700 dark:border-slate-600 font-mono font-bold text-sm tracking-wide" 
-                      />
+                      <div className="flex gap-2">
+                        <input 
+                          type="text" 
+                          value={forgotPhoneInput} 
+                          onChange={(e) => setForgotPhoneInput(e.target.value)} 
+                          onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); } }}
+                          placeholder="उदा: 9876543210 या MASJID-101" 
+                          className="flex-1 min-w-0 p-2.5 border rounded-xl dark:bg-slate-700 dark:border-slate-600 font-mono font-bold text-sm tracking-wide" 
+                        />
+                        {forgotPhoneInput && (
+                          <button
+                            type="button"
+                            onClick={() => setForgotPhoneInput('')}
+                            className="px-2.5 rounded-xl bg-slate-100 dark:bg-slate-700 text-slate-400 hover:text-slate-600 text-xs font-bold"
+                          >
+                            ✕
+                          </button>
+                        )}
+                      </div>
                     </div>
 
-                    {/* Content Based on Entered Phone: DO NOT SHOW ALL MOSQUES */}
-                    {forgotPhoneInput.length < 10 ? (
-                      <div className="p-3 bg-slate-50 dark:bg-slate-700/50 rounded-2xl border border-slate-200 dark:border-slate-600 text-center space-y-1">
-                        <span className="text-xl">🔍</span>
-                        <p className="text-[11px] text-slate-500 dark:text-slate-400 font-medium">
-                          कृपया अपना 10 अंकों का मोबाइल नंबर पूरा डालें। रजिस्ट्रेशन के समय दिए गए नंबर से ही आपकी मस्जिद की ID खोजी जाएगी।
-                        </p>
-                      </div>
-                    ) : (() => {
-                      const cleanEntered = forgotPhoneInput.trim();
-                      const matchedList = Object.values(masjids).filter(m => {
-                        const mPhone = (m.phone || '').replace(/[^0-9]/g, '');
-                        return mPhone.endsWith(cleanEntered) || cleanEntered.endsWith(mPhone);
+                    {/* Filter and Display Matching Mosques */}
+                    {(() => {
+                      const rawInput = (forgotPhoneInput || '').trim();
+                      const digitsOnly = rawInput.replace(/[^0-9]/g, '');
+                      const last10Digits = digitsOnly.length >= 10 ? digitsOnly.slice(-10) : digitsOnly;
+                      const queryLower = rawInput.toLowerCase();
+
+                      if (!rawInput) {
+                        return (
+                          <div className="p-3 bg-slate-50 dark:bg-slate-700/50 rounded-2xl border border-slate-200 dark:border-slate-600 text-center space-y-1">
+                            <span className="text-xl">🔍</span>
+                            <p className="text-[11px] text-slate-500 dark:text-slate-400 font-medium">
+                              ऊपर बॉक्स में अपना 10 अंकों का मोबाइल नंबर या मस्जिद ID दर्ज करें। आपकी मस्जिद की जानकारी नीचे तुरंत दिख जाएगी।
+                            </p>
+                          </div>
+                        );
+                      }
+
+                      const matchedList = Object.values(masjids || {}).filter(m => {
+                        if (!m) return false;
+                        const mIdLower = String(m.id || '').trim().toLowerCase();
+                        const mNameLower = String(m.name || '').trim().toLowerCase();
+                        const mPhoneDigits = String(m.phone || '').replace(/[^0-9]/g, '');
+                        const mLast10 = mPhoneDigits.length >= 10 ? mPhoneDigits.slice(-10) : mPhoneDigits;
+
+                        // 1. Mobile number match
+                        if (last10Digits.length >= 4) {
+                          if (mLast10.includes(last10Digits) || last10Digits.includes(mLast10)) return true;
+                        }
+                        // 2. Mosque ID match
+                        if (queryLower.length >= 2 && mIdLower.includes(queryLower)) return true;
+                        // 3. Mosque Name match
+                        if (queryLower.length >= 3 && mNameLower.includes(queryLower)) return true;
+                        return false;
                       });
 
                       if (matchedList.length === 0) {
                         return (
-                          <div className="p-3 bg-rose-50 dark:bg-rose-900/30 rounded-2xl border border-rose-200 dark:border-rose-800 text-center space-y-1">
+                          <div className="p-3 bg-rose-50 dark:bg-rose-900/30 rounded-2xl border border-rose-200 dark:border-rose-800 text-center space-y-1.5">
                             <span className="text-xl">❌</span>
                             <p className="text-xs font-bold text-rose-700 dark:text-rose-400">
-                              मोबाइल नंबर {cleanEntered} पर कोई मस्जिद नहीं मिली!
+                              "{rawInput}" पर कोई मस्जिद नहीं मिली!
                             </p>
                             <p className="text-[10.5px] text-slate-500 dark:text-slate-400">
-                              कृपया वही नंबर डालें जो मस्जिद रजिस्टर करते समय दिया था।
+                              कृपया वही मोबाइल नंबर या मस्जिद ID दर्ज करें जो रजिस्ट्रेशन के समय उपयोग की गई थी।
                             </p>
                           </div>
                         );
@@ -3386,44 +3599,100 @@
                               <div className="flex justify-between items-center gap-1">
                                 <div className="flex items-center gap-1.5 min-w-0">
                                   <strong className="text-sm font-extrabold text-slate-900 dark:text-white truncate">{m.name}</strong>
-                                  {m.isVerified && <VerifiedBadge size="xs" />}
+                                  {isBlueTickActive(m) && <VerifiedBadge size="xs" />}
                                 </div>
                                 <span className="text-[10px] font-mono font-bold text-emerald-800 dark:text-emerald-300 bg-emerald-100 dark:bg-emerald-900/40 px-2 py-0.5 rounded-md shrink-0">ID: {m.id}</span>
                               </div>
                               <span className="text-[10.5px] text-slate-500 dark:text-slate-400">📍 {m.address}{m.stateLocation ? `, ${m.stateLocation}` : ''}</span>
                               
-                              {/* Security Notice: Password hidden */}
-                              <div className="p-2 bg-amber-50 dark:bg-amber-900/30 border border-amber-200 dark:border-amber-700/60 rounded-xl text-[10.5px] text-amber-900 dark:text-amber-200">
-                                🔒 <b>पासवर्ड सुरक्षा:</b> सुरक्षा कारणों से पासवर्ड स्क्रीन पर नहीं दिखेगा। पासवर्ड पाने के लिए फॉर्म भरें और WhatsApp पर मैसेज करें।।
-                              </div>
+                              {/* Single 1-Click Action + Rate Limit & Ban Check */}
+                              {(() => {
+                                const isBanned = Boolean(m.isBanned || m.isSuspended || (typeof checkIsRegionBanned === 'function' && checkIsRegionBanned(m)));
+                                const userResetHistoryKey = `mc_reset_log_${m.id}`;
+                                let recentAttempts = [];
+                                try {
+                                  const rawLog = safeStorageGet(userResetHistoryKey, '[]');
+                                  const parsedLog = JSON.parse(rawLog);
+                                  if (Array.isArray(parsedLog)) {
+                                    recentAttempts = parsedLog.filter(ts => typeof ts === 'number' && ts > (Date.now() - 24 * 60 * 60 * 1000));
+                                  }
+                                } catch (e) { recentAttempts = []; }
+                                const isLimitExceeded = recentAttempts.length >= 3;
 
-                              <div className="grid grid-cols-1 gap-1.5 pt-0.5">
-                                <button 
-                                  type="button" 
-                                  onClick={() => {
-                                    setLoginMasjidId(m.id);
-                                    setShowForgotCredentialsModal(false);
-                                    setCurrentTab('profile');
-                                    showToast(`✅ मस्जिद ID (${m.id}) लॉगिन फॉर्म में भर दी गई!`);
-                                  }} 
-                                  className="w-full py-2 bg-[#07382c] hover:bg-[#0c4033] text-white rounded-xl text-[10.5px] font-black flex items-center justify-center gap-1.5 shadow-xs transition"
-                                >
-                                  <span>📋 Fill Login Form </span>
-                                </button>
-                                <button 
-                                  type="button" 
-                                  onClick={() => handleSendResetRequest(m)} 
-                                  className="w-full py-2.5 bg-[#25D366] hover:bg-[#20ba59] active:scale-95 text-white rounded-xl text-[10.5px] font-bold flex items-center justify-center gap-1.5 shadow-sm transition"
-                                >
-                                  <span>💬 Request Password (WhatsApp)</span>
-                                </button>
-                              </div>
+                                if (isBanned) {
+                                  return (
+                                    <div className="p-2.5 bg-rose-50 dark:bg-rose-900/30 border border-rose-300 dark:border-rose-700 rounded-xl text-center space-y-1">
+                                      <span className="text-base">⚠️</span>
+                                      <p className="text-[11px] font-bold text-rose-700 dark:text-rose-300">
+                                        सुरक्षा कारणों से यह मस्जिद आईडी अस्थायी रूप से लॉक है। एडमिन से संपर्क करें।
+                                      </p>
+                                    </div>
+                                  );
+                                }
+
+                                if (isLimitExceeded) {
+                                  return (
+                                    <div className="p-2.5 bg-amber-50 dark:bg-amber-900/30 border border-amber-300 dark:border-amber-700 rounded-xl text-center space-y-1">
+                                      <span className="text-base">⛔</span>
+                                      <p className="text-[11px] font-bold text-amber-800 dark:text-amber-300">
+                                        आज के लिए आपकी 3 रिक्वेस्ट पूरी हो चुकी हैं। कृपया 24 घंटे बाद दोबारा कोशिश करें।
+                                      </p>
+                                    </div>
+                                  );
+                                }
+
+                                return (
+                                  <div className="space-y-2 pt-0.5">
+                                    <div className="p-2 bg-emerald-50 dark:bg-emerald-900/25 border border-emerald-200 dark:border-emerald-700/60 rounded-xl text-[10.5px] text-emerald-950 dark:text-emerald-200 leading-snug">
+                                      ✨ <b>1-क्लिक सुविधा:</b> नीचे बटन दबाते ही मस्जिद ID (<b>{m.id}</b>) लॉगिन फॉर्म में भर जाएगी, और 2 से 3 मिनट में आपके रजिस्टर्ड मोबाइल नंबर पर पासवर्ड भेज दिया जाएगा।
+                                      {recentAttempts.length > 0 && (
+                                        <span className="block mt-1 text-[9.5px] text-amber-700 dark:text-amber-400 font-bold">
+                                          (आज के प्रयास: {recentAttempts.length}/3)
+                                        </span>
+                                      )}
+                                    </div>
+                                    <button 
+                                      type="button" 
+                                      onClick={() => handleSendResetRequest(m)} 
+                                      className="w-full py-2.5 bg-[#07382c] hover:bg-[#0c4033] active:scale-95 text-white rounded-xl text-xs font-black flex items-center justify-center gap-2 shadow-md transition"
+                                    >
+                                      <span className="text-base">📩</span>
+                                      <span>Request Password (2-3 मिनट में प्राप्त करें)</span>
+                                    </button>
+                                  </div>
+                                );
+                              })()}
                             </div>
                           ))}
                         </div>
                       );
                     })()}
+                  </form>
+                </div>
+              </div>
+            )}
+
+            {/* RESET SUCCESS POP-UP NOTICE (2-3 MINUTE CONFIRMATION) */}
+            {resetSuccessNotice && (
+              <div className="fixed inset-0 z-[250] bg-black/75 flex items-center justify-center p-4">
+                <div className={`${darkMode ? 'bg-slate-800 text-white' : 'bg-white text-slate-800'} rounded-[2rem] p-5 max-w-sm w-full space-y-3.5 shadow-2xl border text-center dark:border-slate-700`}>
+                  <div className="w-14 h-14 mx-auto rounded-full bg-emerald-100 dark:bg-emerald-900/50 flex items-center justify-center text-3xl">
+                    ✅
                   </div>
+                  <h3 className="font-black text-base text-emerald-900 dark:text-emerald-300">अनुरोध दर्ज हो गया!</h3>
+                  <p className="text-xs leading-relaxed text-slate-600 dark:text-slate-300">
+                    मस्जिद <b>{resetSuccessNotice.masjidName}</b> (ID: <span className="font-mono font-bold text-emerald-700 dark:text-emerald-400">{resetSuccessNotice.masjidId}</span>) की ID आपके लॉगिन फॉर्म में भर दी गई है।
+                  </p>
+                  <div className="p-3 bg-amber-50 dark:bg-amber-900/30 rounded-2xl border border-amber-200 dark:border-amber-700/60 text-xs text-amber-900 dark:text-amber-200 font-bold">
+                    ⏳ अगले <b>2 से 3 मिनट</b> के अंदर आपके रजिस्टर्ड मोबाइल नंबर (<b>{resetSuccessNotice.phone}</b>) पर WhatsApp द्वारा पासवर्ड भेज दिया जाएगा।
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => setResetSuccessNotice(null)}
+                    className="w-full py-2.5 bg-[#07382c] hover:bg-[#0c4033] text-white rounded-xl text-xs font-black shadow-md transition"
+                  >
+                    ठीक है (OK)
+                  </button>
                 </div>
               </div>
             )}
@@ -3732,6 +4001,9 @@
                       </div>
                       <p className="text-[11px] text-slate-500 font-bold mt-0.5 truncate max-w-[220px]">
                         {paywallTargetMasjid ? paywallTargetMasjid.name : 'मस्जिद सदस्यता'}
+                        {paywallTargetService === 'profileServices' && ' • 🛠️ प्रोफ़ाइल सेवाएं अनलॉक'}
+                        {paywallTargetService === 'liveAzan' && ' • 📢 लाइव अज़ान अनलॉक'}
+                        {paywallTargetService === 'blueTick' && ' • 🔵 ब्लू टिक अनलॉक'}
                       </p>
                     </div>
                     <button 
@@ -3742,6 +4014,18 @@
                       ✕
                     </button>
                   </div>
+
+                  {/* Service Specific Alert */}
+                  {paywallTargetService && (
+                    <div className="p-2.5 rounded-2xl bg-amber-50 dark:bg-amber-950/40 border border-amber-300 dark:border-amber-800 text-[11.5px] font-bold text-amber-900 dark:text-amber-200 flex items-center gap-2">
+                      <span className="text-base shrink-0">🔒</span>
+                      <span>
+                        {paywallTargetService === 'profileServices' && 'यह सर्विस लॉक है! पेमेंट करके Namaz Time, Hadith, Notice व प्रोफ़ाइल के सभी बटन चालू करें।'}
+                        {paywallTargetService === 'liveAzan' && 'लाइव अज़ान सर्विस लॉक है! पेमेंट करके लाइव अज़ान ब्रॉडकास्टिंग तुरंत चालू करें।'}
+                        {paywallTargetService === 'blueTick' && 'ब्लू टिक (Verified Badge) लॉक है! पेमेंट करके अपनी मस्जिद के नाम के आगे ब्लू टिक लगवाएं।'}
+                      </span>
+                    </div>
+                  )}
 
                   {/* Pricing Badge */}
                   {(() => {
@@ -3761,9 +4045,9 @@
                           <strong className="text-xl font-mono font-black">₹{activeFee} <span className="text-xs font-bold font-sans">/ 1 वर्ष</span></strong>
                         </div>
                         <div className="text-right text-[10px] font-black space-y-0.5">
-                          <span className="bg-slate-950 text-amber-300 px-2 py-0.5 rounded-full block">✓ लाइव अज़ान</span>
-                          <span className="bg-slate-950 text-amber-300 px-2 py-0.5 rounded-full block">✓ टाइम एडिट</span>
-                          <span className="bg-slate-950 text-amber-300 px-2 py-0.5 rounded-full block">✓ ब्लू टिक (Verified)</span>
+                          <span className={`px-2 py-0.5 rounded-full block ${paywallTargetService === 'liveAzan' ? 'bg-amber-300 text-slate-950 ring-2 ring-white font-extrabold' : 'bg-slate-950 text-amber-300'}`}>✓ लाइव अज़ान</span>
+                          <span className={`px-2 py-0.5 rounded-full block ${paywallTargetService === 'profileServices' ? 'bg-amber-300 text-slate-950 ring-2 ring-white font-extrabold' : 'bg-slate-950 text-amber-300'}`}>✓ टाइम व प्रोफ़ाइल एडिट</span>
+                          <span className={`px-2 py-0.5 rounded-full block ${paywallTargetService === 'blueTick' ? 'bg-amber-300 text-slate-950 ring-2 ring-white font-extrabold' : 'bg-slate-950 text-amber-300'}`}>✓ ब्लू टिक (Verified)</span>
                         </div>
                       </div>
                     );
