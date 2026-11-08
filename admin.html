@@ -430,7 +430,15 @@ function AdminApp() {
 
   // Baileys / WhatsApp Auto-Bot Anti-Ban Security States
   const [botActive, setBotActive] = useState(() => localStorage.getItem('mca_bot_active') !== '0');
-  const [botConnected, setBotConnected] = useState(() => localStorage.getItem('mca_bot_connected') !== '0');
+  const [botConnected, setBotConnected] = useState(false);
+  const [serverBotStatus, setServerBotStatus] = useState({
+    connected: false,
+    status: 'connecting',
+    user: null,
+    qr: null,
+    lastError: null
+  });
+  const [botLoadingAction, setBotLoadingAction] = useState(false);
   const [botCooldownRemaining, setBotCooldownRemaining] = useState(0); // 60s safe delay countdown between consecutive messages
   const [botSendingQueue, setBotSendingQueue] = useState(false);
   const [botSentHistory, setBotSentHistory] = useState(() => {
@@ -763,9 +771,93 @@ function AdminApp() {
     return () => clearInterval(t);
   }, [botCooldownRemaining]);
 
+  // Fetch real Baileys status and QR code from server
+  const fetchBotStatus = async () => {
+    try {
+      const res = await fetch('/api/baileys/status');
+      if (res.ok) {
+        const data = await res.json();
+        setServerBotStatus(data);
+        setBotConnected(Boolean(data.connected));
+      }
+    } catch (e) {
+      console.warn('Bot status polling error:', e);
+    }
+  };
+
+  useEffect(() => {
+    fetchBotStatus();
+    const interval = setInterval(fetchBotStatus, 3500);
+    return () => clearInterval(interval);
+  }, []);
+
+  const handleRefreshQr = async () => {
+    setBotLoadingAction(true);
+    say('WhatsApp QR कोड रीफ़्रेश किया जा रहा है...');
+    try {
+      const res = await fetch('/api/baileys/refresh', { method: 'POST' });
+      const data = await res.json();
+      say(data.message || 'QR कोड अपडेट हुआ!');
+      setTimeout(fetchBotStatus, 1500);
+    } catch (e) {
+      say('Error: ' + e.message, 'err');
+    } finally {
+      setBotLoadingAction(false);
+    }
+  };
+
+  const handleLogoutBot = async () => {
+    setConfirm({
+      t: 'WhatsApp बॉट डिस्कनेक्ट करें?',
+      d: 'इससे वर्तमान WhatsApp सेशन लॉगआउट हो जाएगा और नया डिवाइस लिंक करने के लिए नया QR कोड आएगा।',
+      go: async () => {
+        setBotLoadingAction(true);
+        try {
+          const res = await fetch('/api/baileys/logout', { method: 'POST' });
+          const data = await res.json();
+          say('WhatsApp लॉगआउट हुआ! नया QR कोड आ रहा है...');
+          setTimeout(fetchBotStatus, 1500);
+        } catch (e) {
+          say('Error: ' + e.message, 'err');
+        } finally {
+          setBotLoadingAction(false);
+        }
+      }
+    });
+  };
+
+  // Direct manual send via Baileys API
+  const sendViaBaileysBot = async (phone, text, r) => {
+    if (!phone) return say('मोबाइल नंबर उपलब्ध नहीं है', 'err');
+    if (!serverBotStatus.connected) {
+      say('WhatsApp बॉट अभी कनेक्टेड नहीं है! कृपया पहले QR स्कैन करें, या WhatsApp Web बटन का उपयोग करें।', 'err');
+      return;
+    }
+    setBotLoadingAction(true);
+    say('WhatsApp बॉट से मैसेज भेजा जा रहा है...');
+    try {
+      const res = await fetch('/api/baileys/send', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ phone, text, masjidId: r.masjidId })
+      });
+      const data = await res.json();
+      if (data.success) {
+        await completeAndResolveDuplicates(r, false);
+        say(`✅ ${r.masjidName || r.masjidId} को WhatsApp पासवर्ड सफलतापूर्वक भेजा गया!`);
+      } else {
+        say(`त्रुटि: ${data.error || 'मैसेज नहीं भेजा जा सका'}`, 'err');
+      }
+    } catch (e) {
+      say('Network error: ' + e.message, 'err');
+    } finally {
+      setBotLoadingAction(false);
+    }
+  };
+
   // Baileys WhatsApp Auto-Bot Engine (Strict 1 msg / 60 sec with 24-hr Anti-Ban)
   useEffect(() => {
-    if (!botActive || !botConnected || botCooldownRemaining > 0 || botSendingQueue || !db) return;
+    if (!botActive || !serverBotStatus.connected || botCooldownRemaining > 0 || botSendingQueue || !db) return;
 
     const oneDayAgo = Date.now() - 24 * 60 * 60 * 1000;
     // Find next pending request that hasn't been sent in the last 24h
@@ -776,15 +868,45 @@ function AdminApp() {
       const targetMasjid = masjids[nextPending.masjidId] || all.find(m => m.phone === nextPending.phone) || {};
       const templateIdx = Math.floor(Math.random() * 5);
       const resMsg = getDynamicResetMessage(nextPending, targetMasjid, templateIdx);
+      const phoneToSend = nextPending.phone || targetMasjid.phone;
 
-      // Perform dispatch and auto-resolve
-      completeAndResolveDuplicates(nextPending, false).then(() => {
-        say(`🤖 बॉट: ${targetMasjid.name || nextPending.masjidName} को WhatsApp पासवर्ड डिलीवर हुआ! अगला 60s बाद।`);
-        setBotCooldownRemaining(60); // 60s safe break
+      if (!phoneToSend) {
+        completeAndResolveDuplicates(nextPending, false);
         setBotSendingQueue(false);
-      }).catch(() => setBotSendingQueue(false));
+        return;
+      }
+
+      fetch('/api/baileys/send', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          phone: phoneToSend,
+          text: resMsg.text,
+          masjidId: targetMasjid.id || nextPending.masjidId
+        })
+      })
+      .then(res => res.json())
+      .then(data => {
+        if (data.success) {
+          completeAndResolveDuplicates(nextPending, false).then(() => {
+            say(`🤖 बॉट: ${targetMasjid.name || nextPending.masjidName} को WhatsApp पासवर्ड डिलीवर हुआ! अगला 60s बाद।`);
+            setBotCooldownRemaining(60); // 60s safe break
+            setBotSendingQueue(false);
+          });
+        } else {
+          console.warn('Baileys auto-send API error:', data);
+          say(`बॉट त्रुटि: ${data.error || 'मैसेज नहीं भेजा जा सका'}`, 'err');
+          setBotCooldownRemaining(20);
+          setBotSendingQueue(false);
+        }
+      })
+      .catch(err => {
+        console.error('Baileys network error:', err);
+        setBotCooldownRemaining(20);
+        setBotSendingQueue(false);
+      });
     }
-  }, [passwordResets, botActive, botConnected, botCooldownRemaining, botSendingQueue, botSentHistory, masjids, all]);
+  }, [passwordResets, botActive, serverBotStatus.connected, botCooldownRemaining, botSendingQueue, botSentHistory, masjids, all]);
 
   /* auto-expire: paid plan date nikalte hi access auto-lock */
   useEffect(() => {
@@ -2129,12 +2251,12 @@ function AdminApp() {
                           <h3 className="font-extrabold text-sm text-emerald-950 dark:text-emerald-200">
                             Baileys WhatsApp ऑटो-डिलीवरी बॉट
                           </h3>
-                          <span className={`text-[10px] px-2 py-0.5 rounded-full font-bold ${botConnected ? 'bg-emerald-600 text-white' : 'bg-amber-400 text-slate-950'}`}>
-                            {botConnected ? '🟢 Active & Linked' : '🟡 QR Scan Needed'}
+                          <span className={`text-[10px] px-2 py-0.5 rounded-full font-bold ${serverBotStatus.connected ? 'bg-emerald-600 text-white' : (serverBotStatus.qr ? 'bg-amber-400 text-slate-950' : 'bg-slate-300 dark:bg-slate-700 text-slate-700 dark:text-slate-300')}`}>
+                            {serverBotStatus.connected ? '🟢 Active & Linked' : (serverBotStatus.qr ? '🟡 QR Scan Needed' : '⏳ Connecting…')}
                           </span>
                         </div>
                         <p className="text-xs text-slate-500 dark:text-slate-400">
-                          {botConnected ? 'नंबर: +91 8084329613 से कनेक्टेड (Multi-Device Active)' : 'WhatsApp Web QR स्कैन करें'}
+                          {serverBotStatus.connected ? `नंबर: +${serverBotStatus.user || '8084329613'} से कनेक्टेड (Multi-Device Active)` : 'अपने WhatsApp से नीचे दिए गए QR कोड को स्कैन करके लिंक करें'}
                         </p>
                       </div>
                     </div>
@@ -2154,6 +2276,111 @@ function AdminApp() {
                       </button>
                     </div>
                   </div>
+
+                  {/* REAL-TIME WHATSAPP QR CODE SCANNING OR CONNECTED STATUS CARD */}
+                  {!serverBotStatus.connected ? (
+                    <div className="p-4 bg-white dark:bg-slate-800 rounded-2xl border-2 border-emerald-500 shadow-md">
+                      <div className="flex flex-col md:flex-row items-center gap-6">
+                        <div className="p-3 bg-white rounded-2xl border-2 border-emerald-400 shadow-sm shrink-0 text-center">
+                          {serverBotStatus.qr ? (
+                            <div className="space-y-2">
+                              <img
+                                src={serverBotStatus.qr}
+                                alt="WhatsApp Web QR Code"
+                                className="w-56 h-56 object-contain rounded-lg border border-slate-200"
+                              />
+                              <div className="flex items-center justify-center gap-1.5 text-[11px] font-mono text-emerald-700 font-bold animate-pulse">
+                                <span className="w-2 h-2 rounded-full bg-emerald-500"></span>
+                                <span>LIVE QR CODE READY</span>
+                              </div>
+                            </div>
+                          ) : (
+                            <div className="w-56 h-56 flex flex-col items-center justify-center bg-slate-50 rounded-lg border border-dashed border-slate-300 text-slate-500 text-xs p-4 text-center">
+                              <div className="w-8 h-8 border-3 border-emerald-500 border-t-transparent rounded-full animate-spin mb-2"></div>
+                              <b className="text-slate-800">QR कोड लोड हो रहा है...</b>
+                              <span className="text-[10px] text-slate-400 mt-1">कृपया 2-3 सेकंड प्रतीक्षा करें</span>
+                            </div>
+                          )}
+                        </div>
+
+                        <div className="space-y-3 flex-1 text-left">
+                          <div>
+                            <div className="flex items-center gap-2">
+                              <span className="text-xl">📲</span>
+                              <h4 className="font-extrabold text-sm text-slate-900 dark:text-white">
+                                अपने WhatsApp से बॉट को लिंक (Link Device) करें
+                              </h4>
+                            </div>
+                            <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">
+                              इस QR कोड को स्कैन करते ही आपका बॉट WhatsApp से जुड़ जाएगा और पासवर्ड ऑटोमैटिक भेजना शुरू कर देगा।
+                            </p>
+                          </div>
+
+                          <div className="p-3 bg-emerald-50 dark:bg-emerald-950/40 rounded-xl border border-emerald-200 dark:border-emerald-800 space-y-1.5 text-xs text-slate-700 dark:text-slate-200">
+                            <b className="text-emerald-900 dark:text-emerald-300 block mb-1">📋 लिंक करने के 4 आसान चरण:</b>
+                            <div>1. अपने मोबाइल में <b>WhatsApp</b> ऐप खोलें।</div>
+                            <div>2. ऊपर दाहिने कोने में <b>3 डॉट्स (Menu)</b> या <b>Settings</b> पर जाएँ।</div>
+                            <div>3. <b>Linked Devices (लिंक्ड डिवाइसेस)</b> विकल्प पर टैप करें।</div>
+                            <div>4. <b>Link a Device</b> दबाएँ और बाएँ तरफ दिख रहे QR कोड को अपने कैमरे से स्कैन करें।</div>
+                          </div>
+
+                          <div className="flex flex-wrap items-center gap-2 pt-1">
+                            <button
+                              type="button"
+                              disabled={botLoadingAction}
+                              onClick={handleRefreshQr}
+                              className={`${B} bg-emerald-600 hover:bg-emerald-700 text-white flex items-center gap-1.5 shadow-xs`}
+                            >
+                              <span>🔄 नया QR कोड जनरेट करें (Refresh QR)</span>
+                            </button>
+                            <span className="text-[11px] text-slate-400">
+                              (यदि QR एक्सपायर हो जाए तो रीफ़्रेश दबाएँ)
+                            </span>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  ) : (
+                    <div className="p-4 bg-emerald-600/10 dark:bg-emerald-950/50 border-2 border-emerald-500 rounded-2xl flex flex-wrap items-center justify-between gap-3">
+                      <div className="flex items-center gap-3">
+                        <div className="w-11 h-11 rounded-xl bg-emerald-600 text-white flex items-center justify-center text-2xl shadow-sm">
+                          ✓
+                        </div>
+                        <div>
+                          <div className="flex items-center gap-2">
+                            <h4 className="font-extrabold text-sm text-emerald-950 dark:text-emerald-200">
+                              WhatsApp बॉट सफलतापूर्वक लिंक्ड व सक्रिय है!
+                            </h4>
+                            <span className="text-[10px] bg-emerald-600 text-white px-2 py-0.5 rounded-full font-bold">
+                              ONLINE
+                            </span>
+                          </div>
+                          <p className="text-xs text-slate-600 dark:text-slate-300">
+                            लिंक्ड नंबर: <b className="font-mono text-emerald-700 dark:text-emerald-300">+{serverBotStatus.user || '8084329613'}</b> · सभी पासवर्ड 60s के सुरक्षित अंतराल पर ऑटोमैटिक भेजे जा रहे हैं।
+                          </p>
+                        </div>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <button
+                          type="button"
+                          disabled={botLoadingAction}
+                          onClick={handleRefreshQr}
+                          className={`${B} bg-slate-100 dark:bg-slate-700 hover:bg-slate-200 text-slate-800 dark:text-slate-200`}
+                          title="स्टेटस रिफ्रेश करें"
+                        >
+                          🔄 रीफ़्रेश
+                        </button>
+                        <button
+                          type="button"
+                          disabled={botLoadingAction}
+                          onClick={handleLogoutBot}
+                          className={`${B} bg-rose-50 text-rose-700 border border-rose-300 dark:bg-rose-950/40 dark:text-rose-300 hover:bg-rose-600 hover:text-white font-bold`}
+                        >
+                          🔌 डिसकनेक्ट (Logout)
+                        </button>
+                      </div>
+                    </div>
+                  )}
 
                   {/* Anti-Ban 3 Rules Showcase Banner */}
                   <div className="grid grid-cols-1 md:grid-cols-3 gap-2.5">
@@ -2346,17 +2573,31 @@ function AdminApp() {
 
                             <div className="flex flex-wrap items-center gap-2 shrink-0">
                               {phoneToUse && (
-                                <button
-                                  type="button"
-                                  onClick={() => {
-                                    window.open(waLink(phoneToUse, dynamicMsg), '_blank');
-                                    completeAndResolveDuplicates(r, true);
-                                    say(`${masjidName} को WhatsApp पासवर्ड भेजा गया और लिस्ट से सुलझाया गया!`);
-                                  }}
-                                  className={`${B} bg-[#25D366] hover:bg-[#20ba59] active:scale-95 text-white flex items-center gap-1.5 shadow-md font-extrabold`}
-                                >
-                                  <span>💬 1-Click WhatsApp भेजें</span>
-                                </button>
+                                <div className="flex flex-wrap items-center gap-1.5">
+                                  {serverBotStatus.connected ? (
+                                    <button
+                                      type="button"
+                                      disabled={botLoadingAction}
+                                      onClick={() => sendViaBaileysBot(phoneToUse, dynamicMsg, r)}
+                                      className={`${B} bg-emerald-600 hover:bg-emerald-700 active:scale-95 text-white flex items-center gap-1.5 shadow-md font-extrabold`}
+                                      title="लिंक्ड WhatsApp बॉट द्वारा तुरंत बैकग्राउंड में पासवर्ड भेजें"
+                                    >
+                                      <span>⚡ बॉट से भेजें</span>
+                                    </button>
+                                  ) : null}
+                                  <button
+                                    type="button"
+                                    onClick={() => {
+                                      window.open(waLink(phoneToUse, dynamicMsg), '_blank');
+                                      completeAndResolveDuplicates(r, true);
+                                      say(`${masjidName} को WhatsApp पासवर्ड भेजा गया और लिस्ट से सुलझाया गया!`);
+                                    }}
+                                    className={`${B} bg-[#25D366] hover:bg-[#20ba59] active:scale-95 text-white flex items-center gap-1 shadow-md font-bold`}
+                                    title="WhatsApp Web ब्राउज़र में खोलें"
+                                  >
+                                    <span>💬 WhatsApp Web</span>
+                                  </button>
+                                </div>
                               )}
 
                               {!isBanned && (
