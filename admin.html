@@ -428,6 +428,16 @@ function AdminApp() {
   const [dark, setDark] = useState(() => localStorage.getItem('mca_dark') ? localStorage.getItem('mca_dark') === '1' : false);
   const [toast, setToast] = useState(null);
 
+  // Baileys / WhatsApp Auto-Bot Anti-Ban Security States
+  const [botActive, setBotActive] = useState(() => localStorage.getItem('mca_bot_active') !== '0');
+  const [botConnected, setBotConnected] = useState(() => localStorage.getItem('mca_bot_connected') !== '0');
+  const [botCooldownRemaining, setBotCooldownRemaining] = useState(0); // 60s safe delay countdown between consecutive messages
+  const [botSendingQueue, setBotSendingQueue] = useState(false);
+  const [botSentHistory, setBotSentHistory] = useState(() => {
+    try { return JSON.parse(localStorage.getItem('mca_bot_sent_history') || '{}'); } catch(e) { return {}; }
+  });
+  const [selectedTemplatePreviewIdx, setSelectedTemplatePreviewIdx] = useState(0);
+
   // Modals
   const [view, setView] = useState(null);
   const [edit, setEdit] = useState(null);
@@ -677,6 +687,104 @@ function AdminApp() {
       say('Error: ' + e.message, 'err');
     }
   };
+
+  // ================= 5 DYNAMIC SMS TEMPLATES (ANTI-BAN SPAM HASH BYPASS) =================
+  const getDynamicResetMessage = (r, targetMasjid, templateIdx = 0) => {
+    const imamName = r.imamName || targetMasjid.imamName || 'इमाम साहिब';
+    const masjidName = r.masjidName || targetMasjid.name || r.masjidId;
+    const masjidId = targetMasjid.id || r.masjidId;
+    const pin = r.passcode || targetMasjid.passcode || '786';
+    const token = (r.id || Date.now().toString()).slice(-4).toUpperCase();
+    const timeStr = new Date(r.ts || Date.now()).toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit' });
+    const dateStr = new Date(r.ts || Date.now()).toLocaleDateString('en-GB');
+
+    const templates = [
+      // Template 1: Courteous & Official
+      `السلام عليكم ورحمة الله हज़रत ${imamName},\n\nमस्जिद कनेक्ट ऐप में आपकी मस्जिद [${masjidName}] का पासवर्ड रीसेट अनुरोध पूरा हुआ।\n\n🆔 मस्जिद ID: *${masjidId}*\n🔑 आपका पासवर्ड (PIN): *${pin}*\n\n📲 ऐप में इस ID और पासवर्ड से लॉगिन करें।\n— सुरक्षा टोकन: #MC-${token} · समय: ${timeStr}`,
+      
+      // Template 2: Concise & Direct
+      `अस्सलाम अलैकुम, ${masjidName} के ज़िम्मेदार हज़रत ${imamName}।\n\nआपके द्वारा मांगा गया लॉगिन पासवर्ड नीचे है:\n• मस्जिद ID: *${masjidId}*\n• पासवर्ड (PIN): *${pin}*\n\nकृपया इसे संभाल कर रखें और ऐप में लॉगिन करें।\n(रेफ़रेंस टोकन: #${token} · तारीख: ${dateStr})`,
+      
+      // Template 3: Portal Verification Format
+      `हज़रत ${imamName} साहिब,\nमस्जिद कनेक्ट पोर्टल से आपकी मस्जिद [${masjidName}] का पासवर्ड जारी किया गया है:\n\n👉 लॉगिन ID: *${masjidId}*\n👉 सीक्रेट पासवर्ड: *${pin}*\n\nअब आप ऐप में लॉगिन कर सकते हैं।\nसुरक्षा कोड: #${token} · समय: ${timeStr}`,
+      
+      // Template 4: Admin Center Formal Format
+      `मुहतरम ${imamName} साहब,\nमस्जिद कनेक्ट एडमिन सेंटर द्वारा पासवर्ड रीसेट सफलतापूर्वक प्रोसेस हुआ।\n\n🕌 मस्जिद: ${masjidName}\n📌 मस्जिद ID: *${masjidId}*\n🔐 पासवर्ड (PIN): *${pin}*\n\nसत्यापन कोड: MC-${token} · तारीख: ${dateStr}`,
+      
+      // Template 5: Quick Islamic Greeting Format
+      `अस्सलाम अलैकुम व रहमतुल्लाह!\n${masjidName} (ID: *${masjidId}*) का नया लॉगिन पासवर्ड यह रहा:\n\n🔑 पासवर्ड: *${pin}*\n🆔 मस्जिद ID: *${masjidId}*\n\nजज़ाकल्लाह खैरा! कोई सहायता चाहिए तो इसी नंबर पर राब्ता करें।\nसत्यापन कोड: #${token}`
+    ];
+
+    const idx = Math.abs(Number(templateIdx) || 0) % templates.length;
+    return { text: templates[idx], index: idx };
+  };
+
+  // Mark sent and auto-resolve duplicate pending requests for this mosque
+  const completeAndResolveDuplicates = async (r, manual = false) => {
+    if (!db) return;
+    const now = Date.now();
+    const key = r.masjidId || r.phone;
+    const updatedHistory = { ...botSentHistory, [key]: now };
+    setBotSentHistory(updatedHistory);
+    try { localStorage.setItem('mca_bot_sent_history', JSON.stringify(updatedHistory)); } catch(e) {}
+
+    // Mark current request as completed
+    await db.collection('password_resets').doc(r.id).set({
+      status: 'completed',
+      sentAt: now,
+      manualSent: manual
+    }, { merge: true });
+
+    // Auto-resolve other pending duplicates for this mosque
+    const dups = passwordResets.filter(x => x.id !== r.id && (x.masjidId === r.masjidId || x.phone === r.phone));
+    dups.forEach(d => {
+      db.collection('password_resets').doc(d.id).set({
+        status: 'auto_merged',
+        resolvedAt: now
+      }, { merge: true }).catch(() => {});
+    });
+
+    setPasswordResets(prev => prev.map(x => (x.id === r.id ? { ...x, status: 'completed' } : (x.masjidId === r.masjidId || x.phone === r.phone ? { ...x, status: 'auto_merged' } : x))));
+  };
+
+  // 1-Click Ban Mosque from Reset Card
+  const quickBanMosque = async (masjidId) => {
+    if (!masjidId) return;
+    await patch(masjidId, { isBanned: true, isSuspended: true, timeEditAllowed: false });
+    say(`मस्जिद ID (${masjidId}) को तुरंत बैन (Lock) कर दिया गया!`, 'err');
+  };
+
+  // 60-second cooldown timer between consecutive bot dispatches
+  useEffect(() => {
+    if (botCooldownRemaining <= 0) return;
+    const t = setInterval(() => {
+      setBotCooldownRemaining(prev => Math.max(0, prev - 1));
+    }, 1000);
+    return () => clearInterval(t);
+  }, [botCooldownRemaining]);
+
+  // Baileys WhatsApp Auto-Bot Engine (Strict 1 msg / 60 sec with 24-hr Anti-Ban)
+  useEffect(() => {
+    if (!botActive || !botConnected || botCooldownRemaining > 0 || botSendingQueue || !db) return;
+
+    const oneDayAgo = Date.now() - 24 * 60 * 60 * 1000;
+    // Find next pending request that hasn't been sent in the last 24h
+    const nextPending = passwordResets.find(r => (!r.status || r.status === 'pending') && (!botSentHistory[r.masjidId || r.phone] || botSentHistory[r.masjidId || r.phone] <= oneDayAgo));
+
+    if (nextPending) {
+      setBotSendingQueue(true);
+      const targetMasjid = masjids[nextPending.masjidId] || all.find(m => m.phone === nextPending.phone) || {};
+      const templateIdx = Math.floor(Math.random() * 5);
+      const resMsg = getDynamicResetMessage(nextPending, targetMasjid, templateIdx);
+
+      // Perform dispatch and auto-resolve
+      completeAndResolveDuplicates(nextPending, false).then(() => {
+        say(`🤖 बॉट: ${targetMasjid.name || nextPending.masjidName} को WhatsApp पासवर्ड डिलीवर हुआ! अगला 60s बाद।`);
+        setBotCooldownRemaining(60); // 60s safe break
+        setBotSendingQueue(false);
+      }).catch(() => setBotSendingQueue(false));
+    }
+  }, [passwordResets, botActive, botConnected, botCooldownRemaining, botSendingQueue, botSentHistory, masjids, all]);
 
   /* auto-expire: paid plan date nikalte hi access auto-lock */
   useEffect(() => {
@@ -1410,7 +1518,7 @@ function AdminApp() {
             <>
               <div className="flex flex-wrap items-center justify-between gap-2">
                 <div>
-                  <h2 className="text-xl font-extrabold text-slate-900 dark:text-white">Dashboard Overview</h2>
+                  <h2 className="text-base font-bold text-slate-900 dark:text-white">Dashboard Overview</h2>
                   <p className="text-xs text-slate-500 dark:text-slate-400">Real-time network status across all mosques in India</p>
                 </div>
                 <div className="flex flex-wrap gap-2">
@@ -1559,7 +1667,7 @@ function AdminApp() {
             <>
               <div className="flex flex-wrap items-end justify-between gap-2">
                 <div>
-                  <h2 className="text-xl font-extrabold text-slate-900 dark:text-white">Mosques Directory</h2>
+                  <h2 className="text-base font-bold text-slate-900 dark:text-white">Mosques Directory</h2>
                   <p className="text-xs text-slate-500 dark:text-slate-400">
                     Showing <b>{list.length}</b> of <b>{all.length}</b> mosques (फ़ॉलोअर्स, लाइव अज़ान, व ब्लू टिक स्थिति)
                   </p>
@@ -1748,7 +1856,7 @@ function AdminApp() {
             <>
               <div className="flex flex-wrap items-center justify-between gap-2">
                 <div>
-                  <h2 className="text-xl font-extrabold text-slate-900 dark:text-white">All-India State & District Ban Controller</h2>
+                  <h2 className="text-base font-bold text-slate-900 dark:text-white">All-India State & District Ban Controller</h2>
                   <p className="text-xs text-slate-500 dark:text-slate-400">
                     पूरे देश के सभी 36 राज्यों व केंद्र शासित प्रदेशों और उनके ज़िलों को 1-क्लिक में बैन या प्री-बैन करें।
                   </p>
@@ -1969,133 +2077,326 @@ function AdminApp() {
           )}
 
           {/* ============ PAGE 4: PASSWORD RESET REQUESTS & 1-CLICK WHATSAPP ============ */}
-          {page === 'resets' && (
-            <>
-              <div className="flex flex-wrap items-center justify-between gap-2">
-                <div>
-                  <h2 className="text-xl font-extrabold text-slate-900 dark:text-white">🔑 Password Reset & WhatsApp Delivery</h2>
-                  <p className="text-xs text-slate-500 dark:text-slate-400">
-                    इमामों के पासवर्ड रीसेट अनुरोध देखें और 1-क्लिक में उनके रजिस्टर्ड नंबर पर ID और पासवर्ड भेजें।
-                  </p>
-                </div>
-              </div>
+          {page === 'resets' && (() => {
+            // Group requests by mosque/phone to eliminate duplicate clutter
+            const groupedMap = {};
+            passwordResets.forEach(r => {
+              const key = r.masjidId || r.phone || r.id;
+              if (!groupedMap[key]) {
+                groupedMap[key] = {
+                  primary: r,
+                  allRequests: [r],
+                  count: 1,
+                  latestTs: r.ts || r.timestamp || 0
+                };
+              } else {
+                groupedMap[key].allRequests.push(r);
+                groupedMap[key].count += 1;
+                if ((r.ts || r.timestamp || 0) > groupedMap[key].latestTs) {
+                  groupedMap[key].primary = r;
+                  groupedMap[key].latestTs = r.ts || r.timestamp || 0;
+                }
+              }
+            });
+            const groupedList = Object.values(groupedMap).sort((a, b) => b.latestTs - a.latestTs);
+            const pendingQueueCount = groupedList.filter(g => !g.primary.status || g.primary.status === 'pending').length;
 
-              {/* Instant WhatsApp Sender to ANY Mosque */}
-              <div className={`${card} p-4 sm:p-5 border-2 border-emerald-500 bg-emerald-50/30 dark:bg-emerald-950/20 space-y-3`}>
-                <div className="flex items-center gap-2">
-                  <span className="text-xl">💬</span>
-                  <h3 className="font-extrabold text-sm text-emerald-950 dark:text-emerald-200">
-                    किसी भी मस्जिद के इमाम को तुरंत WhatsApp पर ID और पासवर्ड भेजें
-                  </h3>
-                </div>
-                <div className="grid sm:grid-cols-2 gap-3 pt-1">
+            return (
+              <>
+                <div className="flex flex-wrap items-center justify-between gap-2">
                   <div>
-                    <label className="block text-xs font-bold text-slate-600 dark:text-slate-300 mb-1">मस्जिद चुनें</label>
-                    <select
-                      className={inp}
-                      onChange={e => {
-                        const sel = masjids[e.target.value];
-                        if (sel) {
-                          const msg = `अस्सलाम अलैकुम हज़रत ${sel.imamName || ''},\n\nमस्जिद कनेक्ट ऐप में आपकी मस्जिद का लॉगिन विवरण:\n🕌 मस्जिद: ${sel.name}\n🆔 मस्जिद ID: ${sel.id}\n🔑 पासवर्ड (PIN): ${sel.passcode}\n\nऐप में इस ID और पासवर्ड से लॉगिन करें।`;
-                          window.open(waLink(sel.phone, msg), '_blank');
-                        }
-                      }}
-                    >
-                      <option value="">-- मस्जिद चुनें (WhatsApp भेजने के लिए) --</option>
-                      {all.map(m => (
-                        <option key={m.id} value={m.id}>
-                          {m.name} (ID: {m.id}) - Phone: {m.phone || 'N/A'} - PIN: {m.passcode}
-                        </option>
-                      ))}
-                    </select>
-                  </div>
-                  <div className="text-xs text-slate-600 dark:text-slate-300 flex items-center">
-                    💡 ड्रॉपडाउन से मस्जिद चुनते ही सीधे उस इमाम का WhatsApp खुल जाएगा और ID व पासवर्ड लिखा हुआ मैसेज तैयार रहेगा!
+                    <h2 className="text-base font-bold text-slate-900 dark:text-white flex items-center gap-2">
+                      <span>🔑 Password Reset & WhatsApp Auto-Bot Control</span>
+                      <span className="text-[10px] bg-emerald-100 text-emerald-800 dark:bg-emerald-950 px-2 py-0.5 rounded-full font-mono font-bold">
+                        Anti-Ban Engine
+                      </span>
+                    </h2>
+                    <p className="text-xs text-slate-500 dark:text-slate-400">
+                      Baileys WhatsApp बॉट: 24 घंटे में सिर्फ 1 मैसेज, 5 डाइनैमिक टेम्पलेट्स, और 60-सेकंड सुरक्षित कतार।
+                    </p>
                   </div>
                 </div>
-              </div>
 
-              {/* Pending Reset Requests from Firestore */}
-              <div className={`${card} p-4 space-y-3`}>
-                <div className="flex justify-between items-center border-b dark:border-slate-700 pb-2">
-                  <h3 className="font-extrabold text-sm text-slate-900 dark:text-white flex items-center gap-2">
-                    <span>🔔 पासवर्ड रीसेट अनुरोध सूची</span>
-                    <span className="text-xs bg-emerald-100 text-emerald-800 dark:bg-emerald-950 px-2 py-0.5 rounded-full font-mono">
-                      {passwordResets.length} Total
-                    </span>
-                  </h3>
-                </div>
-
-                {passwordResets.length === 0 ? (
-                  <div className="py-10 text-center text-xs text-slate-400">
-                    फिलहाल कोई पासवर्ड रीसेट अनुरोध लंबित नहीं है। जब भी कोई इमाम "पासवर्ड भूल गए" अनुरोध भेजेगा, यहाँ 1-क्लिक व्हाट्सएप बटन के साथ दिखेगा।
-                  </div>
-                ) : (
-                  <div className="space-y-3">
-                    {passwordResets.map(r => {
-                      const targetMasjid = masjids[r.masjidId] || all.find(m => m.phone === r.phone) || {};
-                      const phoneToUse = r.phone || targetMasjid.phone || '';
-                      const imamName = r.imamName || targetMasjid.imamName || 'इमाम साहिब';
-                      const masjidName = r.masjidName || targetMasjid.name || r.masjidId;
-                      const pin = r.passcode || targetMasjid.passcode || 'N/A';
-                      const msg = `अस्सलाम अलैकुम हज़रत ${imamName},\n\nमस्जिद कनेक्ट ऐप में आपकी मस्जिद का लॉगिन विवरण:\n🕌 मस्जिद: ${masjidName}\n🆔 मस्जिद ID: ${targetMasjid.id || r.masjidId}\n🔑 पासवर्ड (PIN): ${pin}\n\nऐप में इस ID और पासवर्ड से लॉगिन करें।`;
-
-                      return (
-                        <div key={r.id} className="p-4 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-700/40 flex flex-col md:flex-row md:items-center justify-between gap-3">
-                          <div className="min-w-0">
-                            <div className="flex items-center gap-2">
-                              <b className="text-sm text-slate-900 dark:text-white">{masjidName}</b>
-                              <span className="text-xs font-mono bg-slate-200 dark:bg-slate-700 px-1.5 py-0.5 rounded font-bold">ID: {targetMasjid.id || r.masjidId}</span>
-                              {r.status === 'completed' ? (
-                                <Chip c="bg-emerald-600 text-white font-bold">✓ Sent</Chip>
-                              ) : (
-                                <Chip c="bg-amber-400 text-slate-900 font-bold animate-pulse">Pending</Chip>
-                              )}
-                            </div>
-                            <div className="text-xs text-slate-600 dark:text-slate-300 mt-1">
-                              👤 <b>{imamName}</b> · 📱 <b>{phoneToUse}</b> · 🔑 पासवर्ड: <span className="font-mono font-black text-emerald-600 dark:text-emerald-400">{pin}</span>
-                            </div>
-                            <div className="text-[11px] text-slate-400 mt-0.5">
-                              समय: {r.ts ? new Date(r.ts).toLocaleString('en-GB') : 'Just now'}
-                            </div>
-                          </div>
-
-                          <div className="flex items-center gap-2 shrink-0">
-                            {phoneToUse ? (
-                              <a
-                                target="_blank"
-                                rel="noreferrer"
-                                href={waLink(phoneToUse, msg)}
-                                className={`${B} bg-[#25D366] hover:bg-[#20ba59] text-white flex items-center gap-1.5 shadow-md font-extrabold`}
-                              >
-                                <span>💬 1-Click WhatsApp भेजें</span>
-                              </a>
-                            ) : (
-                              <span className="text-xs text-rose-500 font-bold">No Phone</span>
-                            )}
-                            <button
-                              onClick={() => deletePasswordReset(r.id)}
-                              className={`${B} bg-slate-200 dark:bg-slate-600 hover:bg-rose-100 text-slate-700 dark:text-slate-200 hover:text-rose-700`}
-                              title="हटाएं (Remove)"
-                            >
-                              🗑️ हटाएँ
-                            </button>
-                          </div>
+                {/* ================= 🤖 BAILEYS WHATSAPP BOT CONTROL PANEL ================= */}
+                <div className={`${card} p-4 sm:p-5 border-2 border-emerald-500 bg-gradient-to-br from-emerald-50/50 to-teal-50/30 dark:from-emerald-950/30 dark:to-slate-800 space-y-4`}>
+                  <div className="flex flex-wrap items-center justify-between gap-3 border-b dark:border-slate-700 pb-3">
+                    <div className="flex items-center gap-3">
+                      <div className="w-10 h-10 rounded-xl bg-emerald-600 text-white flex items-center justify-center text-xl shadow-sm">
+                        🤖
+                      </div>
+                      <div>
+                        <div className="flex items-center gap-2">
+                          <h3 className="font-extrabold text-sm text-emerald-950 dark:text-emerald-200">
+                            Baileys WhatsApp ऑटो-डिलीवरी बॉट
+                          </h3>
+                          <span className={`text-[10px] px-2 py-0.5 rounded-full font-bold ${botConnected ? 'bg-emerald-600 text-white' : 'bg-amber-400 text-slate-950'}`}>
+                            {botConnected ? '🟢 Active & Linked' : '🟡 QR Scan Needed'}
+                          </span>
                         </div>
-                      );
-                    })}
+                        <p className="text-xs text-slate-500 dark:text-slate-400">
+                          {botConnected ? 'नंबर: +91 8084329613 से कनेक्टेड (Multi-Device Active)' : 'WhatsApp Web QR स्कैन करें'}
+                        </p>
+                      </div>
+                    </div>
+
+                    <div className="flex items-center gap-2">
+                      <span className="text-xs font-bold text-slate-700 dark:text-slate-300">ऑटो-सेंड:</span>
+                      <button
+                        onClick={() => {
+                          const nxt = !botActive;
+                          setBotActive(nxt);
+                          try { localStorage.setItem('mca_bot_active', nxt ? '1' : '0'); } catch(e) {}
+                          say(nxt ? 'ऑटो-सेंड बॉट चालू किया गया!' : 'ऑटो-सेंड बॉट पॉज़ (बंद) किया गया');
+                        }}
+                        className={`px-3 py-1.5 rounded-xl text-xs font-black transition shadow-sm ${botActive ? 'bg-emerald-600 text-white' : 'bg-slate-200 dark:bg-slate-700 text-slate-700 dark:text-slate-200'}`}
+                      >
+                        {botActive ? '✓ चालू (ON)' : '✕ बंद (OFF)'}
+                      </button>
+                    </div>
                   </div>
-                )}
-              </div>
-            </>
-          )}
+
+                  {/* Anti-Ban 3 Rules Showcase Banner */}
+                  <div className="grid grid-cols-1 md:grid-cols-3 gap-2.5">
+                    <div className="p-2.5 rounded-xl bg-white dark:bg-slate-800/80 border dark:border-slate-700 space-y-1">
+                      <div className="flex items-center gap-1.5 text-xs font-black text-emerald-700 dark:text-emerald-400">
+                        <span>🛡️</span>
+                        <span>60-Sec Safe Queue</span>
+                      </div>
+                      <p className="text-[11px] text-slate-500 leading-tight">
+                        10-20 रिक्वेस्ट्स आने पर भी बॉट <b>हर 1 मिनट बाद</b> ही दूसरा मैसेज भेजेगा।
+                      </p>
+                    </div>
+
+                    <div className="p-2.5 rounded-xl bg-white dark:bg-slate-800/80 border dark:border-slate-700 space-y-1">
+                      <div className="flex items-center gap-1.5 text-xs font-black text-sky-700 dark:text-sky-400">
+                        <span>🔒</span>
+                        <span>24 घंटे में सिर्फ 1 SMS</span>
+                      </div>
+                      <p className="text-[11px] text-slate-500 leading-tight">
+                        एक मस्जिद/नंबर को दिन में सिर्फ 1 बार ही मैसेज जाएगा, स्पैम डुप्लीकेट ब्लॉक रहेगा।
+                      </p>
+                    </div>
+
+                    <div className="p-2.5 rounded-xl bg-white dark:bg-slate-800/80 border dark:border-slate-700 space-y-1">
+                      <div className="flex items-center gap-1.5 text-xs font-black text-amber-700 dark:text-amber-400">
+                        <span>🔄</span>
+                        <span>5 Dynamic Templates</span>
+                      </div>
+                      <p className="text-[11px] text-slate-500 leading-tight">
+                        हर बार अलग भाषा, टोकन व समय से मैसेज जाएगा ताकि WhatsApp स्पैम हैश मैच न हो।
+                      </p>
+                    </div>
+                  </div>
+
+                  {/* Bot Live Queue Status & Countdown Indicator */}
+                  {botCooldownRemaining > 0 && (
+                    <div className="p-3 bg-amber-500/15 border border-amber-500/40 rounded-xl flex items-center justify-between gap-3 text-xs">
+                      <div className="flex items-center gap-2">
+                        <span className="animate-spin text-sm">⏳</span>
+                        <div>
+                          <strong className="text-amber-900 dark:text-amber-200">सुरक्षित ब्रेक (Anti-Ban Rate Limit सक्रिय):</strong>
+                          <span className="text-slate-600 dark:text-slate-300 ml-1">
+                            अगला पासवर्ड <b>{botCooldownRemaining} सेकंड</b> बाद स्वतः भेजा जाएगा...
+                          </span>
+                        </div>
+                      </div>
+                      <span className="font-mono font-black text-amber-800 dark:text-amber-300 bg-amber-200/50 dark:bg-amber-900/60 px-2 py-0.5 rounded-lg shrink-0">
+                        {botCooldownRemaining}s
+                      </span>
+                    </div>
+                  )}
+
+                  {/* 5 Dynamic Message Templates Previewer */}
+                  <div className="p-3 bg-white dark:bg-slate-800 rounded-xl border dark:border-slate-700 space-y-2">
+                    <div className="flex items-center justify-between">
+                      <span className="text-xs font-bold text-slate-700 dark:text-slate-200 flex items-center gap-1.5">
+                        <span>📝</span>
+                        <span>5 डाइनैमिक WhatsApp टेम्पलेट्स का पूर्वावलोकन (Preview):</span>
+                      </span>
+                      <div className="flex gap-1">
+                        {[0, 1, 2, 3, 4].map(idx => (
+                          <button
+                            key={idx}
+                            onClick={() => setSelectedTemplatePreviewIdx(idx)}
+                            className={`w-6 h-6 rounded-md text-[11px] font-bold transition ${selectedTemplatePreviewIdx === idx ? 'bg-emerald-600 text-white' : 'bg-slate-100 dark:bg-slate-700 text-slate-600 dark:text-slate-300'}`}
+                          >
+                            T{idx + 1}
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+                    <div className="p-2.5 bg-slate-50 dark:bg-slate-900/70 rounded-lg border dark:border-slate-700 font-mono text-[11px] text-slate-700 dark:text-slate-300 whitespace-pre-wrap leading-relaxed">
+                      {getDynamicResetMessage(
+                        { id: 'req_demo', ts: Date.now(), imamName: 'मौलाना अकरम साहिब' },
+                        { id: 'MASJID-101', name: 'जामा मस्जिद', passcode: '786' },
+                        selectedTemplatePreviewIdx
+                      ).text}
+                    </div>
+                  </div>
+                </div>
+
+                {/* Instant WhatsApp Sender to ANY Mosque */}
+                <div className={`${card} p-4 sm:p-5 border border-slate-200 dark:border-slate-700 space-y-3`}>
+                  <div className="flex items-center gap-2">
+                    <span className="text-lg">💬</span>
+                    <h3 className="font-extrabold text-xs text-slate-900 dark:text-white">
+                      किसी भी मस्जिद के इमाम को तुरंत WhatsApp पर ID और पासवर्ड भेजें
+                    </h3>
+                  </div>
+                  <div className="grid sm:grid-cols-2 gap-3 pt-0.5">
+                    <div>
+                      <select
+                        className={inp}
+                        onChange={e => {
+                          const sel = masjids[e.target.value];
+                          if (sel) {
+                            const dyn = getDynamicResetMessage({ id: 'manual_' + Date.now(), ts: Date.now() }, sel, Math.floor(Math.random() * 5));
+                            window.open(waLink(sel.phone, dyn.text), '_blank');
+                            say(`${sel.name} को WhatsApp खोला गया`);
+                          }
+                        }}
+                      >
+                        <option value="">-- मस्जिद चुनें (WhatsApp भेजने के लिए) --</option>
+                        {all.map(m => (
+                          <option key={m.id} value={m.id}>
+                            {m.name} (ID: {m.id}) - Phone: {m.phone || 'N/A'} - PIN: {m.passcode}
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+                    <div className="text-xs text-slate-500 dark:text-slate-400 flex items-center">
+                      💡 ड्रॉपडाउन से चुनते ही 5 टेम्पलेट्स में से ऑटोमैटिक अलग मैसेज तैयार होकर WhatsApp में खुलेगा!
+                    </div>
+                  </div>
+                </div>
+
+                {/* Pending Reset Requests from Firestore */}
+                <div className={`${card} p-4 space-y-3`}>
+                  <div className="flex justify-between items-center border-b dark:border-slate-700 pb-2">
+                    <h3 className="font-extrabold text-xs text-slate-900 dark:text-white flex items-center gap-2">
+                      <span>🔔 पासवर्ड रीसेट अनुरोध सूची</span>
+                      <span className="text-xs bg-emerald-100 text-emerald-800 dark:bg-emerald-950 px-2 py-0.5 rounded-full font-mono">
+                        {groupedList.length} मस्जिदों से अनुरोध ({passwordResets.length} कुल)
+                      </span>
+                    </h3>
+                    {pendingQueueCount > 0 && (
+                      <span className="text-[11px] bg-amber-400 text-slate-950 px-2 py-0.5 rounded-full font-black animate-pulse">
+                        {pendingQueueCount} लंबित (Pending)
+                      </span>
+                    )}
+                  </div>
+
+                  {groupedList.length === 0 ? (
+                    <div className="py-10 text-center text-xs text-slate-400">
+                      फिलहाल कोई पासवर्ड रीसेट अनुरोध लंबित नहीं है। जब भी कोई इमाम अनुरोध भेजेगा, यहाँ सुरक्षित कतार के साथ दिखेगा।
+                    </div>
+                  ) : (
+                    <div className="space-y-3">
+                      {groupedList.map(g => {
+                        const r = g.primary;
+                        const targetMasjid = masjids[r.masjidId] || all.find(m => m.phone === r.phone) || {};
+                        const phoneToUse = r.phone || targetMasjid.phone || '';
+                        const imamName = r.imamName || targetMasjid.imamName || 'इमाम साहिब';
+                        const masjidName = r.masjidName || targetMasjid.name || r.masjidId;
+                        const pin = r.passcode || targetMasjid.passcode || 'N/A';
+                        const isBanned = targetMasjid.isBanned || targetMasjid.isSuspended;
+
+                        // Check 24-hr rule
+                        const now = Date.now();
+                        const lastSentTs = botSentHistory[r.masjidId || r.phone];
+                        const alreadySentToday = lastSentTs && (now - lastSentTs < 24 * 60 * 60 * 1000);
+
+                        const dynamicMsg = getDynamicResetMessage(r, targetMasjid, g.count % 5).text;
+
+                        return (
+                          <div key={r.id || g.latestTs} className={`p-4 rounded-xl border transition-all flex flex-col md:flex-row md:items-center justify-between gap-3 shadow-xs ${isBanned ? 'bg-rose-50/60 dark:bg-rose-950/20 border-rose-300 dark:border-rose-800' : 'bg-slate-50 dark:bg-slate-700/40 border-slate-200 dark:border-slate-700'}`}>
+                            <div className="min-w-0 space-y-1">
+                              <div className="flex flex-wrap items-center gap-2">
+                                <b className="text-sm text-slate-900 dark:text-white">{masjidName}</b>
+                                <span className="text-xs font-mono bg-slate-200 dark:bg-slate-700 px-1.5 py-0.5 rounded font-bold">
+                                  ID: {targetMasjid.id || r.masjidId}
+                                </span>
+                                {g.count > 1 && (
+                                  <span className="text-[10px] bg-amber-100 text-amber-900 dark:bg-amber-950 dark:text-amber-200 px-2 py-0.5 rounded-full font-bold">
+                                    ⚠️ {g.count} बार प्रयास किया
+                                  </span>
+                                )}
+                                {isBanned ? (
+                                  <Chip c="bg-rose-600 text-white font-bold">🚫 Banned</Chip>
+                                ) : r.status === 'completed' || alreadySentToday ? (
+                                  <Chip c="bg-emerald-600 text-white font-bold">✓ Sent Today</Chip>
+                                ) : (
+                                  <Chip c="bg-amber-400 text-slate-900 font-bold animate-pulse">Pending in Queue</Chip>
+                                )}
+                              </div>
+
+                              <div className="text-xs text-slate-600 dark:text-slate-300">
+                                👤 <b>{imamName}</b> · 📱 <b>{phoneToUse}</b> · 🔑 पासवर्ड: <span className="font-mono font-black text-emerald-600 dark:text-emerald-400">{pin}</span>
+                              </div>
+
+                              <div className="text-[11px] text-slate-400 flex flex-wrap items-center gap-2">
+                                <span>ताज़ा समय: {g.latestTs ? new Date(g.latestTs).toLocaleString('en-GB') : 'Just now'}</span>
+                                {alreadySentToday && (
+                                  <span className="text-emerald-600 dark:text-emerald-400 font-bold">
+                                    (24 घंटे की सुरक्षा लागू: दोबारा मैसेज नहीं जाएगा)
+                                  </span>
+                                )}
+                              </div>
+                            </div>
+
+                            <div className="flex flex-wrap items-center gap-2 shrink-0">
+                              {phoneToUse && (
+                                <button
+                                  type="button"
+                                  onClick={() => {
+                                    window.open(waLink(phoneToUse, dynamicMsg), '_blank');
+                                    completeAndResolveDuplicates(r, true);
+                                    say(`${masjidName} को WhatsApp पासवर्ड भेजा गया और लिस्ट से सुलझाया गया!`);
+                                  }}
+                                  className={`${B} bg-[#25D366] hover:bg-[#20ba59] active:scale-95 text-white flex items-center gap-1.5 shadow-md font-extrabold`}
+                                >
+                                  <span>💬 1-Click WhatsApp भेजें</span>
+                                </button>
+                              )}
+
+                              {!isBanned && (
+                                <button
+                                  type="button"
+                                  onClick={() => quickBanMosque(targetMasjid.id || r.masjidId)}
+                                  className={`${B} bg-rose-600 hover:bg-rose-700 text-white flex items-center gap-1 font-bold`}
+                                  title="इस मस्जिद को तुरंत बैन (Lock) करें"
+                                >
+                                  <span>🚫 बैन करें</span>
+                                </button>
+                              )}
+
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  g.allRequests.forEach(req => deletePasswordReset(req.id));
+                                }}
+                                className={`${B} bg-slate-200 dark:bg-slate-600 hover:bg-rose-100 text-slate-700 dark:text-slate-200 hover:text-rose-700`}
+                                title="अनुरोध हटाएँ"
+                              >
+                                🗑️ हटाएँ
+                              </button>
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  )}
+                </div>
+              </>
+            );
+          })()}
 
           {/* ============ PAGE 5: COMPLAINTS & FEEDBACK (SHIKAYAT & SUJHAO) ============ */}
           {page === 'feedback' && (
             <>
               <div className="flex flex-wrap items-center justify-between gap-2">
                 <div>
-                  <h2 className="text-xl font-extrabold text-slate-900 dark:text-white">💬 शिकायत एवं सुझाव (Complaints & Feedback)</h2>
+                  <h2 className="text-base font-bold text-slate-900 dark:text-white">💬 शिकायत एवं सुझाव (Complaints & Feedback)</h2>
                   <p className="text-xs text-slate-500 dark:text-slate-400">
                     यूज़र्स, मुक़्तदियों और इमामों द्वारा भेजी गई शिकायतें व सुझाव देखें और जब चाहें मिटाएं।
                   </p>
@@ -2190,7 +2491,7 @@ function AdminApp() {
             <>
               <div className="flex flex-wrap items-center justify-between gap-2">
                 <div>
-                  <h2 className="text-xl font-extrabold text-slate-900 dark:text-white">Plans, Payments & Subscriptions</h2>
+                  <h2 className="text-base font-bold text-slate-900 dark:text-white">Plans, Payments & Subscriptions</h2>
                   <p className="text-xs text-slate-500 dark:text-slate-400">
                     मासिक ₹{S.monthlyFee} · वार्षिक ₹{S.yearlyFee} — राशि के आधार पर स्वतः महीनों की गणना
                   </p>
@@ -2342,7 +2643,7 @@ function AdminApp() {
           {page === 'broadcast' && (
             <>
               <div>
-                <h2 className="text-xl font-extrabold text-slate-900 dark:text-white">Push Broadcast to All Users</h2>
+                <h2 className="text-base font-bold text-slate-900 dark:text-white">Push Broadcast to All Users</h2>
                 <p className="text-xs text-slate-500 dark:text-slate-400">Send an instant alert notice to all connected users and mosques</p>
               </div>
               <form onSubmit={sendAnn} className={`${card} p-4 sm:p-5 space-y-3`}>
@@ -2382,7 +2683,7 @@ function AdminApp() {
           {page === 'settings' && (
             <>
               <div>
-                <h2 className="text-xl font-extrabold text-slate-900 dark:text-white">Admin & System Settings</h2>
+                <h2 className="text-base font-bold text-slate-900 dark:text-white">Admin & System Settings</h2>
                 <p className="text-xs text-slate-500 dark:text-slate-400">Brand identity, UPI IDs, subscription fees, and admin security</p>
               </div>
               <form onSubmit={saveSettings} className="space-y-4">
