@@ -1,4 +1,4 @@
-<script type="text/babel">
+
       const { useState, useEffect, useMemo, useRef } = React;
 
       // GOOGLE FIREBASE CLOUD DATABASE (Permanent 24/7 Cloud Storage)
