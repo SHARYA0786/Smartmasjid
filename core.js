@@ -193,7 +193,16 @@
       };
       const ALL_INDIA_STATES = Object.keys(INDIA_STATE_DISTRICTS).sort();
 
-      const DEFAULT_SCHEDULE = { fajr: '05:20', fajrJamat: '05:45', sunrise: '06:40', zuhr: '12:35', zuhrJamat: '13:00', asr: '16:20', asrJamat: '16:45', sunset: '12:15', maghrib: '17:50', maghribJamat: '18:10', isha: '19:15', ishaJamat: '19:45', jumaAzan: '13:00', jumaJamat: '13:30' };
+      const DEFAULT_SCHEDULE = { khatmSehri: '04:45', fajr: '05:20', fajrJamat: '05:45', sunrise: '06:40', zuhr: '12:35', zuhrJamat: '13:00', asr: '16:20', asrJamat: '16:45', sunset: '12:15', maghrib: '17:50', maghribJamat: '18:10', isha: '19:15', ishaJamat: '19:45', jumaAzan: '13:00', jumaJamat: '13:30' };
+      const addMinutesToTime = (timeStr, minutesToAdd) => {
+        if (!timeStr || typeof timeStr !== 'string' || !timeStr.includes(':')) return timeStr || '04:45';
+        const [h, m] = timeStr.split(':').map(Number);
+        let total = ((h || 0) * 60 + (m || 0) + minutesToAdd) % 1440;
+        if (total < 0) total += 1440;
+        const nh = Math.floor(total / 60);
+        const nm = total % 60;
+        return `${String(nh).padStart(2, '0')}:${String(nm).padStart(2, '0')}`;
+      };
       const PM_KEYS = ['iftar', 'zuhr', 'zuhrJamat', 'asr', 'asrJamat', 'maghrib', 'maghribJamat', 'isha', 'ishaJamat', 'sunset', 'jumaAzan', 'jumaJamat'];
       // purana data "04:20" (12-ghante style) ho sakta hai: dopahar ke baad wali namaz ko 24-ghante me badalta hai
       const normTime = (key, v) => {
@@ -202,7 +211,16 @@
         let h = parseInt(m[1], 10); if (PM_KEYS.includes(key) && h < 12) h += 12;
         return `${String(h).padStart(2, '0')}:${m[2]}`;
       };
-      const normSchedule = (s) => { const out = {}; Object.keys(DEFAULT_SCHEDULE).forEach(k => { out[k] = normTime(k, (s && s[k]) || DEFAULT_SCHEDULE[k]); }); return out; };
+      const normSchedule = (s) => {
+        const out = {};
+        Object.keys(DEFAULT_SCHEDULE).forEach(k => {
+          out[k] = normTime(k, (s && s[k]) || DEFAULT_SCHEDULE[k]);
+        });
+        if (!(s && s.khatmSehri)) {
+          out.khatmSehri = addMinutesToTime(out.fajr || '05:20', -15);
+        }
+        return out;
+      };
       const splitTime12 = (key, v, def) => {
         const n = normTime(key, v || def); const m = n.match(/^(\d{1,2}):(\d{2})/); if (!m) return { t: n, ap: '' };
         let h = parseInt(m[1], 10); const ap = h >= 12 ? 'PM' : 'AM'; h = h % 12 || 12; return { t: `${h}:${m[2]}`, ap };
@@ -489,6 +507,158 @@
           if (hp && hp.m === 9 && hp.d === 1) return g;
         }
         return null;
+      };
+      const toLocalIso = (d) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+      const parseIsoLocal = (iso) => {
+        if (!iso || typeof iso !== 'string' || !iso.includes('-')) return null;
+        const [y, m, d] = iso.split('-').map(Number);
+        if (!y || !m || !d) return null;
+        const dt = new Date(y, m - 1, d, 0, 0, 0, 0);
+        return isNaN(dt.getTime()) ? null : dt;
+      };
+      const makeLocalDateTime = (dayDate, time24) => {
+        const parts = String(time24 || '04:45').split(':').map(Number);
+        return new Date(dayDate.getFullYear(), dayDate.getMonth(), dayDate.getDate(), parts[0] || 0, parts[1] || 0, 0, 0);
+      };
+      const formatDurationShort = (diffMs) => {
+        const totalMin = Math.max(0, Math.ceil(diffMs / 60000));
+        const h = Math.floor(totalMin / 60);
+        const m = totalMin % 60;
+        return h > 0 ? `${h}h ${m}m` : `${m}m`;
+      };
+      const findUpcomingOrActiveRamadan = (now = new Date()) => {
+        const todayMid = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 0, 0, 0, 0);
+        const noonToday = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 12, 0, 0, 0);
+        for (let i = -30; i <= 420; i++) {
+          const g = new Date(noonToday.getTime() + i * 86400000);
+          const hp = hijriParts(g);
+          if (hp && hp.m === 9 && hp.d === 1) {
+            const gMid = new Date(g.getFullYear(), g.getMonth(), g.getDate(), 0, 0, 0, 0);
+            const gEnd = new Date(gMid.getTime() + 29 * 86400000);
+            if (gEnd >= todayMid) {
+              return { startDt: gMid, startIso: toLocalIso(gMid), hijriYear: hp.y || 1448 };
+            }
+          }
+        }
+        const fb = new Date(now.getFullYear() + 1, 1, 1, 0, 0, 0, 0);
+        return { startDt: fb, startIso: toLocalIso(fb), hijriYear: 1448 };
+      };
+      const getSmartRamadanState = (masjid, now = new Date(), build30Fn) => {
+        const MONTHS_SHORT = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+        const todayMid = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 0, 0, 0, 0);
+        const todayIso = toLocalIso(now);
+        const sch = normSchedule(masjid && masjid.schedule);
+        const baseSehri24 = sch.khatmSehri || addMinutesToTime(sch.fajr || '05:20', -15);
+        const baseIftar24 = sch.maghrib || '17:50';
+
+        const est = findUpcomingOrActiveRamadan(now);
+        const rz = (masjid && masjid.ramzan) || {};
+        const confirmedDt = (rz.moonConfirmed && rz.confirmedStartDate) ? parseIsoLocal(rz.confirmedStartDate) : null;
+        let isMoonConfirmed = false;
+        let isRamadanActive = false;
+        let rozaDayNumber = 0;
+
+        if (confirmedDt) {
+          const daysSince = Math.round((todayMid.getTime() - confirmedDt.getTime()) / 86400000);
+          const maxDays = Number(rz.confirmedRozaCount) || 30;
+          if (daysSince >= -7 && daysSince < maxDays) {
+            isMoonConfirmed = true;
+            if (daysSince >= 0) {
+              isRamadanActive = true;
+              rozaDayNumber = daysSince + 1;
+            }
+          }
+        }
+
+        const startIso = isMoonConfirmed ? rz.confirmedStartDate : est.startIso;
+        const startDt = (isMoonConfirmed ? confirmedDt : est.startDt) || est.startDt;
+        const ramadanYear = startDt.getFullYear();
+        const hpStart = hijriParts(new Date(startDt.getFullYear(), startDt.getMonth(), startDt.getDate(), 12));
+        const hijriYear = (hpStart && hpStart.y) ? hpStart.y : est.hijriYear;
+
+        let daysList = [];
+        if (isMoonConfirmed && Array.isArray(rz.days) && rz.days.length === 30 && rz.days[0] && rz.days[0].date === startIso) {
+          daysList = rz.days.map((d, idx) => ({
+            day: idx + 1,
+            date: d.date,
+            sehri: d.sehri || rz.sehri || baseSehri24,
+            iftar: d.iftar || rz.iftar || baseIftar24
+          }));
+        } else if (!isMoonConfirmed && Array.isArray(rz.days) && rz.days.length === 30 && rz.days[0] && rz.days[0].date) {
+          const rzDt0 = parseIsoLocal(rz.days[0].date);
+          if (rzDt0 && Math.abs((rzDt0.getTime() - est.startDt.getTime()) / 86400000) <= 45) {
+            daysList = rz.days;
+          }
+        }
+        if (!daysList.length && typeof build30Fn === 'function') {
+          const bSehri = isMoonConfirmed ? (rz.sehri || baseSehri24) : baseSehri24;
+          const bIftar = isMoonConfirmed ? (rz.iftar || baseIftar24) : baseIftar24;
+          daysList = build30Fn(startIso, bSehri, bIftar, true);
+        }
+
+        const todayRow = daysList.find(d => d.date === todayIso) || null;
+        const todaySehri24 = (todayRow && todayRow.sehri) || (isMoonConfirmed && rz.sehri) || baseSehri24;
+        const todayIftar24 = (todayRow && todayRow.iftar) || (isMoonConfirmed && rz.iftar) || baseIftar24;
+        const daysUntilStart = Math.max(0, Math.round((startDt.getTime() - todayMid.getTime()) / 86400000));
+
+        let countdownTargetType = 'sehri';
+        let homeLineIcon = '🌙';
+        let homeLineText = `रमज़ान आने में ${daysUntilStart} दिन बाक़ी (संभावित)`;
+        let homeRightBadge = `${startDt.getDate()} ${MONTHS_SHORT[startDt.getMonth()]} ${startDt.getFullYear()}`;
+
+        if (isMoonConfirmed && isRamadanActive) {
+          const sehriDt = makeLocalDateTime(now, todaySehri24);
+          const iftarDt = makeLocalDateTime(now, todayIftar24);
+          if (now < sehriDt) {
+            countdownTargetType = 'sehri';
+            homeLineIcon = '🌙';
+            homeLineText = `रोज़ा #${rozaDayNumber} • सहरी ख़त्म होने में ${formatDurationShort(sehriDt - now)} बाक़ी`;
+            homeRightBadge = t12('khatmSehri', todaySehri24);
+          } else if (now < iftarDt) {
+            countdownTargetType = 'iftar';
+            homeLineIcon = '🌇';
+            homeLineText = `रोज़ा #${rozaDayNumber} • इफ़्तार में ${formatDurationShort(iftarDt - now)} बाक़ी`;
+            homeRightBadge = t12('iftar', todayIftar24);
+          } else if (rozaDayNumber < 30) {
+            const nextRow = daysList[rozaDayNumber];
+            const tomorrowSehri24 = (nextRow && nextRow.sehri) || baseSehri24;
+            const tomorrowMid = new Date(now.getFullYear(), now.getMonth(), now.getDate() + 1);
+            const tomorrowSehriDt = makeLocalDateTime(tomorrowMid, tomorrowSehri24);
+            countdownTargetType = 'sehri';
+            homeLineIcon = '🌙';
+            homeLineText = `कल रोज़ा #${rozaDayNumber + 1} • सहरी में ${formatDurationShort(tomorrowSehriDt - now)} बाक़ी`;
+            homeRightBadge = t12('khatmSehri', tomorrowSehri24);
+          } else {
+            countdownTargetType = 'iftar';
+            homeLineIcon = '✨';
+            homeLineText = 'माह-ए-रमज़ान मुकम्मल — चाँद मुबारक!';
+            homeRightBadge = 'कैलेंडर';
+          }
+        } else if (isMoonConfirmed && daysUntilStart > 0) {
+          countdownTargetType = 'sehri';
+          homeLineIcon = '🌙';
+          homeLineText = daysUntilStart === 1 ? 'चाँद कन्फर्म! कल से पहला रोज़ा शुरू' : `चाँद कन्फर्म! ${daysUntilStart} दिन बाद पहला रोज़ा`;
+          homeRightBadge = `${startDt.getDate()} ${MONTHS_SHORT[startDt.getMonth()]}`;
+        }
+
+        return {
+          isMoonConfirmed,
+          isRamadanActive,
+          rozaDayNumber,
+          daysUntilStart,
+          startDateIso: startIso,
+          ramadanYear,
+          hijriYear,
+          baseSehri24,
+          baseIftar24,
+          todaySehri24,
+          todayIftar24,
+          daysList,
+          countdownTargetType,
+          homeLineIcon,
+          homeLineText,
+          homeRightBadge
+        };
       };
 
       // ---- Qibla compass ----
@@ -779,7 +949,7 @@
         const [liveAzanOn, setLiveAzanOn] = useState(() => safeStorageGet('mc_live_azan_on') !== '0');
         const [showPermModal, setShowPermModal] = useState(() => safeStorageGet('mc_perm_asked') !== '1');
         const [showRamzanEditModal, setShowRamzanEditModal] = useState(false);
-        const [ramzanDraft, setRamzanDraft] = useState({ sehri: '', iftar: '', startDate: '', days: [] });
+        const [ramzanDraft, setRamzanDraft] = useState({ sehri: '', iftar: '', startDate: '', moonConfirmed: false, days: [] });
         const [showFeedbackModal, setShowFeedbackModal] = useState(false);
         const [feedbackMsg, setFeedbackMsg] = useState('');
         const [showServerSupportModal, setShowServerSupportModal] = useState(false);
@@ -1728,16 +1898,6 @@
           if (next) { azanStreamer.initContext(); showToast('🔔 लाइव अज़ान ON: अज़ान शुरू होते ही आवाज़ आएगी'); }
           else { setActiveListeningMasjidId(null); setIncomingAzanAlert(null); showToast('🔕 लाइव अज़ान OFF: अब लाइव अज़ान नहीं सुनाई देगी'); }
         };
-        const addMinutesToTime = (timeStr, minutesToAdd) => {
-          if (!timeStr || typeof timeStr !== 'string' || !timeStr.includes(':')) return timeStr || '05:00';
-          const [h, m] = timeStr.split(':').map(Number);
-          let total = ((h || 0) * 60 + (m || 0) + minutesToAdd) % 1440;
-          if (total < 0) total += 1440;
-          const nh = Math.floor(total / 60);
-          const nm = total % 60;
-          return `${String(nh).padStart(2, '0')}:${String(nm).padStart(2, '0')}`;
-        };
-
         const build30DaysTimetable = (baseStartDate, sSehri, sIftar, progressive = true) => {
           const list = [];
           const today = new Date();
@@ -1755,7 +1915,7 @@
           }
 
           const baseSehri = sSehri || '04:45';
-          const baseIftar = sIftar || '18:15';
+          const baseIftar = sIftar || '17:50';
 
           for (let i = 0; i < 30; i++) {
             const d = new Date(startYear, startMonth, startDay + i);
@@ -1778,24 +1938,23 @@
           return list;
         };
 
+        const smartRamadan = useMemo(() => {
+          return getSmartRamadanState(currentMasjid || loggedImamMasjid, currentTime, build30DaysTimetable);
+        }, [currentMasjid, loggedImamMasjid, currentTime]);
+
         const openRamzanEdit = () => {
           const m = masjids[loggedImamMasjidId]; if (!m) return;
           if (!isProfileServicesActive(m)) {
             openPremiumPaywallModal(m, 'profileServices');
             return;
           }
-          const sch = normSchedule(m.schedule);
-          const rz = m.ramzan || {};
-          const todayStr = new Date().toISOString().slice(0, 10);
-          const sDate = rz.startDate || todayStr;
-          const sSehri = rz.sehri || sch.fajr || '04:45';
-          const sIftar = rz.iftar || sch.maghrib || '18:15';
-          let daysArr = (Array.isArray(rz.days) && rz.days.length === 30) ? rz.days : build30DaysTimetable(sDate, sSehri, sIftar, true);
+          const sr = getSmartRamadanState(m, currentTime, build30DaysTimetable);
           setRamzanDraft({
-            sehri: sSehri,
-            iftar: sIftar,
-            startDate: sDate,
-            days: daysArr
+            sehri: sr.todaySehri24 || sr.baseSehri24 || '04:45',
+            iftar: sr.todayIftar24 || sr.baseIftar24 || '17:50',
+            startDate: sr.startDateIso,
+            moonConfirmed: sr.isMoonConfirmed,
+            days: sr.daysList
           });
           setShowRamzanEditModal(true);
         };
@@ -1803,19 +1962,31 @@
         const handleSaveRamzan = (e) => {
           if (e && e.preventDefault) e.preventDefault();
           const target = masjids[loggedImamMasjidId]; if (!target) return;
+          const isConfirmed = !!ramzanDraft.moonConfirmed;
+          const todayIso = toLocalIso(new Date());
+          const extraHijriSync = {};
+          if (isConfirmed && ramzanDraft.startDate === todayIso) {
+            const hp = hijriParts(new Date());
+            extraHijriSync.hijriDateStr = `01 Ramadan ${(hp && hp.y) ? hp.y : 1448}`;
+            extraHijriSync.lastDateSetISO = todayIso;
+          }
           publishMasjidUpdate({
             ...target,
+            ...extraHijriSync,
             ramzan: {
               sehri: ramzanDraft.sehri,
               iftar: ramzanDraft.iftar,
               startDate: ramzanDraft.startDate,
+              moonConfirmed: isConfirmed,
+              confirmedStartDate: isConfirmed ? ramzanDraft.startDate : '',
+              confirmedRozaCount: 30,
               days: ramzanDraft.days,
               updatedAt: Date.now()
             },
             updatedAt: Date.now()
           });
           setShowRamzanEditModal(false);
-          showToast('✅ 30 दिन का सहरी व इफ़्तार कैलेंडर सेव हो गया');
+          showToast(isConfirmed ? '🌙 चाँद कन्फर्म व 30 दिन का पक्का कैलेंडर सेव हो गया!' : '✅ संभावित सहरी व इफ़्तार कैलेंडर सेव हो गया');
         };
 
         const handleStartDateChange = (newDateStr) => {
@@ -2005,7 +2176,7 @@
           const parts = [
             `🕌 ${m.name}`, `📍 ${place}`, '',
             '🕒 नमाज़ के औक़ात:',
-            `Fajr: ${f('fajr')} (जमात ${f('fajrJamat')})`, `Zuhr: ${f('zuhr')} (जमात ${f('zuhrJamat')})`, `Asr: ${f('asr')} (जमात ${f('asrJamat')})`,
+            `ख़त्म-ए-सहरी: ${f('khatmSehri')}`, `Fajr: ${f('fajr')} (जमात ${f('fajrJamat')})`, `Zuhr: ${f('zuhr')} (जमात ${f('zuhrJamat')})`, `Asr: ${f('asr')} (जमात ${f('asrJamat')})`,
             `Maghrib: ${f('maghrib')} (जमात ${f('maghribJamat')})`, `Isha: ${f('isha')} (जमात ${f('ishaJamat')})`, `Juma: ${f('jumaAzan')} (जमात ${f('jumaJamat')})`,
             m.dailyHadith ? `\n📖 आज की हदीस:\n${m.dailyHadith}${m.dailyHadithRef ? ' ' + m.dailyHadithRef : ''}` : null,
             APP_SHARE_LINK ? `\n📲 ऐप का लिंक: ${APP_SHARE_LINK}` : null
@@ -2296,724 +2467,106 @@
 
 
             {/* TAB 1: HOME */}
-            {currentTab === 'home' && (
-              <main className="px-3 py-1.5 space-y-1.5 flex-1 z-0">
-                {!currentMasjid ? (
-                  landingRoleChoice !== 'muqtadi' ? (
-                    <div className="py-2 space-y-3.5">
-                      <div className="text-center px-1"><span className="text-[11px] font-bold text-emerald-700 dark:text-emerald-400 uppercase">अस्सलाम अलैकुम</span><h2 className="text-base sm:text-lg font-black mt-0.5">आप क्या हैं?</h2></div>
-                      <div className="grid grid-cols-2 gap-3">
-                        <button onClick={() => setShowRegisterModal(true)} className="p-3.5 rounded-3xl border-2 text-center flex flex-col items-center justify-between gap-2 shadow-md bg-white dark:bg-slate-800 border-emerald-600 min-h-[145px]">
-                          <span className="text-3xl">👳</span><div><span className="font-black text-xs block">1. क्या आप इमाम हैं?</span></div><span className="w-full py-1.5 bg-[#07382c] text-white rounded-xl font-bold text-[11px]">➕ रजिस्टर करें</span>
-                        </button>
-                        <button onClick={handleSelectMuqtadiRole} className="p-3.5 rounded-3xl border-2 text-center flex flex-col items-center justify-between gap-2 shadow-md min-h-[145px] bg-white dark:bg-slate-800 border-slate-300 dark:border-slate-700">
-                          <span className="text-3xl">🕌</span><div><span className="font-black text-xs block">2. मैं मुक़्तदी हूँ</span></div><span className="w-full py-1.5 bg-amber-500 text-slate-950 rounded-xl font-black text-[11px]">📍 मस्जिदें देखें</span>
-                        </button>
-                      </div>
-                      <div className="text-center pt-0.5"><button onClick={() => setCurrentTab('profile')} className="text-xs text-emerald-800 dark:text-emerald-400 font-bold hover:underline py-1 px-3 rounded-full bg-emerald-50 dark:bg-slate-800 border border-emerald-200 dark:border-slate-700">🔑 इमाम लॉगिन करें</button></div>
-                    </div>
-                  ) : (
-                    <div className="py-2 space-y-3 animate-in fade-in duration-300">
-                      <div className={`p-3.5 rounded-3xl border shadow-sm ${darkMode ? 'bg-slate-800/90 border-slate-700' : 'bg-white border-slate-200'}`}>
-                        <div className="flex justify-between items-center pb-2 mb-2 border-b dark:border-slate-700">
-                          <span className="text-xs font-black">📍 10 KM के दायरे की मस्जिदें</span>
-                          {hasGps && (
-                            <span className="text-[10px] font-bold text-emerald-800 bg-emerald-100 dark:bg-emerald-900/50 dark:text-emerald-300 px-2 py-0.5 rounded-full">
-                              {masjidsWithin10Km.length} उपलब्ध
-                            </span>
-                          )}
-                        </div>
-                        {isInitialSyncing && Object.keys(masjids).length === 0 ? (
-                          <div className="py-8 text-center space-y-2.5">
-                            <div className="w-8 h-8 mx-auto border-3 border-emerald-600 border-t-transparent rounded-full animate-spin"></div>
-                            <p className="text-xs font-bold text-slate-600 dark:text-slate-300">मस्जिदें लोड हो रही हैं...</p>
-                          </div>
-                        ) : !hasGps ? (
-                          <div className="py-6 px-3 text-center space-y-3">
-                            <div className="w-12 h-12 mx-auto rounded-full bg-amber-100 dark:bg-amber-900/40 text-amber-600 dark:text-amber-400 flex items-center justify-center text-2xl shadow-inner">
-                              📍
-                            </div>
-                            <div className="space-y-1">
-                              <h4 className="font-black text-sm text-slate-800 dark:text-white">📍 GPS / लोकेशन चालू करें</h4>
-                              <p className="text-xs text-slate-500 dark:text-slate-400 max-w-xs mx-auto leading-relaxed">
-                                आपके 10 KM के दायरे की मस्जिदें देखने के लिए फोन की लोकेशन (GPS) चालू करें।
-                              </p>
-                            </div>
-                            <button 
-                              type="button"
-                              onClick={() => handleFetchGpsLocation(false)} 
-                              disabled={isFetchingGps}
-                              className="inline-flex items-center gap-2 px-5 py-2.5 bg-gradient-to-r from-[#0c4033] to-[#07382c] text-white rounded-xl font-bold text-xs shadow-md active:scale-95 transition-all"
-                            >
-                              {isFetchingGps ? <span className="animate-spin text-sm">⏳</span> : <span>🔄</span>}
-                              {isFetchingGps ? 'लोकेशन खोजी जा रही है...' : 'GPS लोकेशन चालू करें'}
-                            </button>
-                          </div>
-                        ) : masjidsWithin10Km.length === 0 ? (
-                          <div className="py-6 px-3 text-center space-y-3">
-                            <div className="w-12 h-12 mx-auto rounded-full bg-emerald-50 dark:bg-slate-700 text-emerald-700 dark:text-emerald-300 flex items-center justify-center text-2xl shadow-inner">
-                              🕌
-                            </div>
-                            <div className="space-y-1">
-                              <h4 className="font-black text-sm text-slate-800 dark:text-white">10 KM के दायरे में कोई मस्जिद नहीं मिली</h4>
-                              <p className="text-xs text-slate-500 dark:text-slate-400 max-w-xs mx-auto leading-relaxed">
-                                आपके 10 KM के दायरे में अभी कोई मस्जिद रजिस्टर नहीं है। अपने इलाके की मस्जिद के इमाम साहब को यह ऐप शेयर करके रजिस्टर करवाएं!
-                              </p>
-                            </div>
-                            <div className="flex items-center justify-center gap-2 pt-1">
-                              <button 
-                                type="button"
-                                onClick={() => handleFetchGpsLocation(false)} 
-                                disabled={isFetchingGps}
-                                className="px-3 py-1.5 bg-emerald-100 dark:bg-slate-700 text-emerald-800 dark:text-emerald-300 rounded-xl font-bold text-xs active:scale-95 transition"
-                              >
-                                🔄 GPS रिफ्रेश
-                              </button>
-                              <button 
-                                type="button"
-                                onClick={() => {
-                                  if (navigator.share) {
-                                    navigator.share({ title: 'Masjid Connect', text: 'अपनी मस्जिद को ऑनलाइन कनेक्ट करने के लिए Masjid Connect ऐप इस्तेमाल करें: ', url: window.location.href }).catch(() => {});
-                                  } else {
-                                    navigator.clipboard.writeText(window.location.href);
-                                    showToast('📋 लिंक कॉपी हो गया!');
-                                  }
-                                }}
-                                className="px-3 py-1.5 bg-[#07382c] text-white rounded-xl font-bold text-xs active:scale-95 transition"
-                              >
-                                📤 शेयर करें
-                              </button>
-                            </div>
-                          </div>
-                        ) : (
-                          <div className="space-y-2">
-                            {masjidsWithin10Km.map((m) => (
-                              <div key={m.id} onClick={() => toggleFavorite(m.id)} className={`p-2.5 rounded-2xl border cursor-pointer flex items-center gap-2.5 ${darkMode ? 'bg-slate-700/60 border-slate-600' : 'bg-[#eaf5ed] border-emerald-200'}`}>
-                                <img src={m.photo || 'https://images.unsplash.com/photo-1542816417-0983c9c9ad53?auto=format&fit=crop&w=800&q=80'} alt={m.name} className="w-[96px] h-[96px] rounded-full object-cover border-2 border-emerald-600/40 shrink-0" />
-                                <div className="flex-1 min-w-0">
-                                  <div className="flex items-center gap-1.5 flex-wrap">
-                                    <h4 className="font-black text-[15px] leading-tight break-words">{m.name}</h4>
-                                    {isBlueTickActive(m) && <VerifiedBadge size="sm" />}
-                                  </div>
-                                  <p className="text-[11px] text-slate-500 mt-0.5 leading-snug break-words">📍 {m.address}</p>
-                                  {m.distanceText && (
-                                    <span className="inline-block mt-1 text-[10px] font-mono font-bold text-emerald-800 bg-emerald-100 px-1.5 rounded">📍 {m.distanceText}</span>
-                                  )}
-                                </div>
-                                <div className="flex flex-col gap-[3px] shrink-0" onClick={(e) => e.stopPropagation()}>
-                                  <FavButton isFav={m.isFav} onClick={() => toggleFavorite(m.id)} />
-                                  <InfoButton onClick={() => openMasjidInfo(m.id, 'home')} />
-                                  <RouteButton m={m} />
-                                </div>
-                              </div>
-                            ))}
-                          </div>
-                        )}
-                      </div>
-                      <div className="text-center pt-1"><button onClick={() => setCurrentTab('profile')} className="text-[11px] text-slate-500 hover:text-emerald-700">👳 क्या आप इमाम हैं? प्रोफाइल टैब में लॉगिन करें →</button></div>
-                    </div>
-                  )
-                ) : (
-                  <>
-
-                    {/* COMBINED DATE & SEHRI / IFTAR CARD */}
-                    {(() => {
-                      const rz = currentMasjid.ramzan || {};
-                      const sch0 = normSchedule(currentMasjid.schedule);
-                      const curY = currentTime.getFullYear();
-                      const curM = String(currentTime.getMonth() + 1).padStart(2, '0');
-                      const curD = String(currentTime.getDate()).padStart(2, '0');
-                      const todayIso = `${curY}-${curM}-${curD}`;
-                      const todayCustom = Array.isArray(rz.days) ? rz.days.find(d => d.date === todayIso) : null;
-                      const sehriVal = (todayCustom && todayCustom.sehri) || rz.sehri || sch0.fajr;
-                      const iftarVal = (todayCustom && todayCustom.iftar) || rz.iftar || sch0.maghrib;
-                      return (
-                        <div className={`${darkMode ? 'bg-slate-800 border-slate-700' : 'bg-white border-slate-200'} rounded-2xl py-1.5 px-3 border shadow-xs`}>
-                          <div className="grid grid-cols-2 divide-x divide-slate-200 dark:divide-slate-700">
-                            {/* Left Column: English Date + Sehri */}
-                            <div className="pr-2 space-y-1">
-                              <div className="flex items-center gap-1.5">
-                                <span className="text-xs">📅</span>
-                                <div className="min-w-0">
-                                  <span className="text-[9.5px] text-slate-500 dark:text-slate-400 font-medium block leading-none">English Date</span>
-                                  <strong className="text-[11.5px] font-bold block leading-tight mt-0.5 truncate text-slate-900 dark:text-slate-100">
-                                    {currentTime.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: '2-digit', year: 'numeric' })}
-                                  </strong>
-                                </div>
-                              </div>
-                              <div className="flex items-center gap-1.5 pt-0.5 border-t border-slate-100 dark:border-slate-700/60">
-                                <span className="text-xs text-sky-600">🌙</span>
-                                <div>
-                                  <span className="text-[9.5px] text-slate-500 dark:text-slate-400 font-medium block leading-none">Sehri</span>
-                                  <strong className="text-xs font-mono font-black text-sky-700 dark:text-sky-300 block leading-tight">
-                                    {t12('sehri', sehriVal)}
-                                  </strong>
-                                </div>
-                              </div>
-                            </div>
-
-                            {/* Right Column: Hijri Date + Iftar */}
-                            <div className="pl-2 space-y-1">
-                              <div className="flex items-center gap-1.5">
-                                <span className="text-xs">🕌</span>
-                                <div className="min-w-0">
-                                  <span className="text-[9.5px] text-slate-500 dark:text-slate-400 font-medium block leading-none">Hijri Date</span>
-                                  <strong className="text-[11.5px] font-bold font-urdu block leading-tight mt-0.5 truncate text-emerald-800 dark:text-emerald-400">
-                                    {getAutoCalculatedHijriDate(currentMasjid, currentTime)}
-                                  </strong>
-                                </div>
-                              </div>
-                              <div className="flex items-center gap-1.5 pt-0.5 border-t border-slate-100 dark:border-slate-700/60">
-                                <span className="text-xs text-amber-500">🌇</span>
-                                <div>
-                                  <span className="text-[9.5px] text-slate-500 dark:text-slate-400 font-medium block leading-none">Iftar</span>
-                                  <strong className="text-xs font-mono font-black text-amber-600 dark:text-amber-400 block leading-tight">
-                                    {t12('iftar', iftarVal)}
-                                  </strong>
-                                </div>
-                              </div>
-                            </div>
-                          </div>
-                        </div>
-                      );
-                    })()}
-
-                    {/* NAMAZ PROGRESS BAR */}
-                    <NamazProgressBar schedule={currentMasjid.schedule} currentTime={currentTime} darkMode={darkMode} />
-
-                    {/* NAMAZ KE AWAQAT */}
-                    <div className="bg-[#0c4033] text-white rounded-2xl p-2.5 shadow-md relative mt-1.5">
-                      <div className="flex justify-between items-center mb-2">
-                         <h3 className="font-bold text-xs tracking-wide">Namaz Ke Awaqat</h3>
-                         <button onClick={toggleLiveAzanPref} aria-pressed={liveAzanOn} className={`px-2 py-0.5 rounded-full text-[10px] font-extrabold border flex items-center gap-1 ${liveAzanOn ? 'bg-rose-500 border-rose-300 text-white' : 'bg-white/10 border-white/30 text-white/80'}`}>{liveAzanOn ? '🔔' : '🔕'} लाइव अज़ान: {liveAzanOn ? 'ON' : 'OFF'}</button>
-                      </div>
-                      
-                      <div className="grid grid-cols-5 gap-1.5 text-center">
-                        <div className="bg-[#c8f0d8] text-slate-900 rounded-xl p-1.5 flex flex-col items-center">
-                          <span className="text-xs sm:text-sm font-black text-slate-900 tracking-wide uppercase">FAJR</span>
-                          <div className="my-0.5 text-emerald-700 text-lg">🌅</div>
-                          <span className="text-[9.5px] text-slate-600 font-bold leading-none uppercase">AZAN</span>
-                          <strong className="text-xs sm:text-[13.5px] font-mono font-bold my-0.5 leading-tight">{T(currentMasjid.schedule, 'fajr', '05:20')}</strong>
-                          <span className="text-[9.5px] text-slate-600 font-bold mt-0.5 leading-none uppercase">JAMAT</span>
-                          <strong className="text-xs sm:text-[13.5px] font-mono font-black text-emerald-950 leading-tight">{T(currentMasjid.schedule, 'fajrJamat', '05:45')}</strong>
-                        </div>
-                        <div className="bg-[#fff6be] text-slate-900 rounded-xl p-1.5 flex flex-col items-center">
-                          <span className="text-xs sm:text-sm font-black text-slate-900 tracking-wide uppercase">ZUHR</span>
-                          <div className="my-0.5 text-amber-600 text-lg">☀️</div>
-                          <span className="text-[9.5px] text-slate-600 font-bold leading-none uppercase">AZAN</span>
-                          <strong className="text-xs sm:text-[13.5px] font-mono font-bold my-0.5 leading-tight">{T(currentMasjid.schedule, 'zuhr', '12:35')}</strong>
-                          <span className="text-[9.5px] text-slate-600 font-bold mt-0.5 leading-none uppercase">JAMAT</span>
-                          <strong className="text-xs sm:text-[13.5px] font-mono font-black text-amber-950 leading-tight">{T(currentMasjid.schedule, 'zuhrJamat', '01:00')}</strong>
-                        </div>
-                        <div className="bg-[#fedfc7] text-slate-900 rounded-xl p-1.5 flex flex-col items-center">
-                          <span className="text-xs sm:text-sm font-black text-slate-900 tracking-wide uppercase">ASR</span>
-                          <div className="my-0.5 text-orange-600 text-lg">🌤️</div>
-                          <span className="text-[9.5px] text-slate-600 font-bold leading-none uppercase">AZAN</span>
-                          <strong className="text-xs sm:text-[13.5px] font-mono font-bold my-0.5 leading-tight">{T(currentMasjid.schedule, 'asr', '04:20')}</strong>
-                          <span className="text-[9.5px] text-slate-600 font-bold mt-0.5 leading-none uppercase">JAMAT</span>
-                          <strong className="text-xs sm:text-[13.5px] font-mono font-black text-orange-950 leading-tight">{T(currentMasjid.schedule, 'asrJamat', '04:45')}</strong>
-                        </div>
-                        <div className="bg-[#ffd7dc] text-slate-900 rounded-xl p-1.5 flex flex-col items-center">
-                          <span className="text-xs sm:text-sm font-black text-slate-900 tracking-wide uppercase">MAGHRIB</span>
-                          <div className="my-0.5 text-rose-600 text-lg">🌇</div>
-                          <span className="text-[9.5px] text-slate-600 font-bold leading-none uppercase">AZAN</span>
-                          <strong className="text-xs sm:text-[13.5px] font-mono font-bold my-0.5 leading-tight">{T(currentMasjid.schedule, 'maghrib', '05:50')}</strong>
-                          <span className="text-[9.5px] text-slate-600 font-bold mt-0.5 leading-none uppercase">JAMAT</span>
-                          <strong className="text-xs sm:text-[13.5px] font-mono font-black text-rose-950 leading-tight">{T(currentMasjid.schedule, 'maghribJamat', '06:10')}</strong>
-                        </div>
-                        <div className="bg-[#d2edfd] text-slate-900 rounded-xl p-1.5 flex flex-col items-center">
-                          <span className="text-xs sm:text-sm font-black text-slate-900 tracking-wide uppercase">ISHA</span>
-                          <div className="my-0.5 text-sky-700 text-lg">🌙</div>
-                          <span className="text-[9.5px] text-slate-600 font-bold leading-none uppercase">AZAN</span>
-                          <strong className="text-xs sm:text-[13.5px] font-mono font-bold my-0.5 leading-tight">{T(currentMasjid.schedule, 'isha', '07:15')}</strong>
-                          <span className="text-[9.5px] text-slate-600 font-bold mt-0.5 leading-none uppercase">JAMAT</span>
-                          <strong className="text-xs sm:text-[13.5px] font-mono font-black text-sky-950 leading-tight">{T(currentMasjid.schedule, 'ishaJamat', '07:45')}</strong>
-                        </div>
-                      </div>
-                      
-                      <div className="grid grid-cols-3 gap-1.5 mt-2.5 text-center">
-                         <div className="bg-[#fff3c4] text-slate-900 rounded-xl p-2 flex flex-col items-center shadow-xs">
-                           <span className="text-xs sm:text-[13px] font-black text-amber-950 leading-tight uppercase tracking-wider">TULU AFTAB</span>
-                           <div className="text-amber-500 text-lg my-0.5">🌄</div>
-                           <strong className="text-xs sm:text-sm font-mono font-black mt-0.5">{T(currentMasjid.schedule, 'sunrise', '06:40')}</strong>
-                         </div>
-                         <div className="bg-[#ffe4cc] text-slate-900 rounded-xl p-2 flex flex-col items-center shadow-xs">
-                           <span className="text-xs sm:text-[13px] font-black text-orange-950 leading-tight uppercase tracking-wider">ZAWAL</span>
-                           <div className="text-orange-500 text-lg my-0.5">☀️</div>
-                           <strong className="text-xs sm:text-sm font-mono font-black mt-0.5">{T(currentMasjid.schedule, 'sunset', '12:15')}</strong>
-                         </div>
-                         <div className="bg-[#bbf7d0] text-slate-900 rounded-xl p-2 flex flex-col items-center border border-emerald-300 shadow-xs">
-                           <span className="text-xs sm:text-[13px] font-black text-emerald-950 leading-tight uppercase tracking-wider">JUMA</span>
-                           <div className="text-emerald-700 text-lg my-0.5">🕌</div>
-                           <div className="flex justify-between w-full px-0.5 mt-0.5">
-                             <div className="text-center">
-                               <span className="text-[9px] text-slate-600 block leading-none font-bold uppercase">AZAN</span>
-                               <strong className="text-xs sm:text-[13px] font-mono font-bold leading-tight">{T(currentMasjid.schedule, 'jumaAzan', '01:00')}</strong>
-                             </div>
-                             <div className="text-center">
-                               <span className="text-[9px] text-slate-600 block leading-none font-bold uppercase">JAMAT</span>
-                               <strong className="text-xs sm:text-[13px] font-mono font-black text-emerald-950 leading-tight">{T(currentMasjid.schedule, 'jumaJamat', '01:30')}</strong>
-                             </div>
-                           </div>
-                         </div>
-                      </div>
-
-                      {/* WHATSAPP SHARE BUTTON: In Namaz card on Muqtadi Home page */}
-                      <button
-                        type="button"
-                        onClick={() => shareMasjidWhatsApp(currentMasjid)}
-                        className="w-full mt-2 py-2 bg-[#25D366] hover:bg-[#20ba59] active:scale-95 text-white rounded-xl font-bold text-xs flex items-center justify-center gap-1.5 shadow-sm transition"
-                      >
-                        <span className="text-sm">📲</span>
-                        <span>नमाज़ के औक़ात WhatsApp पर शेयर करें</span>
-                      </button>
-                    </div>
-
-                    <div className={`${darkMode ? 'bg-slate-800 border-slate-700' : 'bg-[#eaf5ed] border-emerald-100'} rounded-2xl p-3 border mt-3`}><h4 className="font-extrabold text-[#07382c] dark:text-emerald-400 text-xs mb-1">Aaj ki Hadees</h4><div className="flex items-start gap-2.5"><div className="w-7 h-7 rounded-lg bg-emerald-700 text-white flex justify-center items-center">📖</div><div className="flex-1"><p className="text-xs leading-relaxed font-medium">{currentMasjid.dailyHadith || '“Ilm hasil karna har Musalman mard aur aurat par farz hai.”'}</p><span className="text-[10px] text-slate-500 block mt-0.5">{currentMasjid.dailyHadithRef || '— (Ibn Majah)'}</span></div></div></div>
-                    {/* ताज़ा ऐलान: मस्जिद व एडमिन दोनों के ऐलान शामिल */}
-                    {allCombinedNotifications.length > 0 && (
-                      <div id="taza-aelan-section" className={`${darkMode ? 'bg-slate-800 border-slate-700' : 'bg-white border-slate-200'} rounded-2xl p-3 border mt-3 scroll-mt-20`}>
-                        <div className="flex items-center justify-between mb-2">
-                          <h4 className="font-extrabold text-[#07382c] dark:text-emerald-400 text-xs flex items-center gap-1.5">
-                            <span>📢</span>
-                            <span>ताज़ा ऐलान</span>
-                          </h4>
-                          <span className="text-[10px] font-bold text-slate-400">
-                            {allCombinedNotifications.length} ऐलान
-                          </span>
-                        </div>
-                        <div className="space-y-2 max-h-72 overflow-y-auto pr-0.5">
-                          {allCombinedNotifications.map(n => (
-                            <div key={n.id} className={`p-2.5 rounded-xl border transition ${n.isAdmin ? (darkMode ? 'bg-amber-950/40 border-amber-700/70' : 'bg-amber-50/90 border-amber-300') : (darkMode ? 'bg-slate-700/60 border-slate-600' : 'bg-emerald-50/80 border-emerald-200')}`}>
-                              <div className="flex items-center justify-between gap-1.5 flex-wrap mb-1">
-                                <span className={`text-[10px] font-black px-1.5 py-0.5 rounded-md flex items-center gap-1 shadow-2xs ${n.isAdmin ? 'bg-amber-500 text-slate-950' : 'bg-[#07382c] text-white'}`}>
-                                  {n.isAdmin ? '👑 मस्जिद कनेक्ट एडमिन' : `🕌 ${n.senderName || currentMasjid?.name || 'मस्जिद'}`}
-                                </span>
-                                <span className="text-[10px] text-slate-500 dark:text-slate-400 font-mono font-bold">🕒 {n.date}</span>
-                              </div>
-                              <strong className="text-xs font-bold block text-slate-900 dark:text-white">{n.title}</strong>
-                              <p className="text-[11px] leading-relaxed mt-0.5 font-urdu text-slate-700 dark:text-slate-200 whitespace-pre-wrap">{n.message || n.body}</p>
-                            </div>
-                          ))}
-                        </div>
-                      </div>
-                    )}
-                  </>
-                )}
-              </main>
+            {currentTab === 'home' && window.HomeTabFeature && (
+              <window.HomeTabFeature
+                currentMasjid={currentMasjid}
+                landingRoleChoice={landingRoleChoice}
+                masjids={masjids}
+                masjidsWithin10Km={masjidsWithin10Km}
+                hasGps={hasGps}
+                isInitialSyncing={isInitialSyncing}
+                isFetchingGps={isFetchingGps}
+                darkMode={darkMode}
+                currentTime={currentTime}
+                liveAzanOn={liveAzanOn}
+                allCombinedNotifications={allCombinedNotifications}
+                smartRamadan={smartRamadan}
+                setShowRegisterModal={setShowRegisterModal}
+                handleSelectMuqtadiRole={handleSelectMuqtadiRole}
+                setCurrentTab={setCurrentTab}
+                handleFetchGpsLocation={handleFetchGpsLocation}
+                showToast={showToast}
+                toggleFavorite={toggleFavorite}
+                openMasjidInfo={openMasjidInfo}
+                toggleLiveAzanPref={toggleLiveAzanPref}
+                shareMasjidWhatsApp={shareMasjidWhatsApp}
+                isBlueTickActive={isBlueTickActive}
+                getAutoCalculatedHijriDate={getAutoCalculatedHijriDate}
+                T={T}
+                VerifiedBadge={VerifiedBadge}
+                FavButton={FavButton}
+                InfoButton={InfoButton}
+                RouteButton={RouteButton}
+                NamazProgressBar={NamazProgressBar}
+              />
             )}
 
             {/* TAB 2: NEARBY */}
-            {currentTab === 'nearby' && (
-              <main className="px-3.5 py-3 space-y-3 flex-1 z-0 pb-24">
-                <div className="flex justify-between items-center">
-                  <h3 className="font-extrabold text-sm">📍 10 KM के दायरे की मस्जिदें</h3>
-                  {hasGps && (
-                    <span className="text-[11px] font-mono font-bold text-emerald-700 bg-emerald-100 dark:bg-emerald-950/60 dark:text-emerald-300 px-2 py-0.5 rounded-full">
-                      {masjidsWithin10Km.length} उपलब्ध
-                    </span>
-                  )}
-                </div>
-
-                {isInitialSyncing && Object.keys(masjids).length === 0 ? (
-                  <div className="py-12 text-center space-y-2.5">
-                    <div className="w-8 h-8 mx-auto border-3 border-emerald-600 border-t-transparent rounded-full animate-spin"></div>
-                    <p className="text-xs font-bold text-slate-600 dark:text-slate-300">मस्जिदें लोड हो रही हैं...</p>
-                  </div>
-                ) : !hasGps ? (
-                  <div className={`p-6 text-center space-y-3 rounded-2xl border ${darkMode ? 'bg-slate-800 border-slate-700' : 'bg-white border-slate-200 shadow-xs'}`}>
-                    <div className="w-12 h-12 mx-auto rounded-full bg-amber-100 dark:bg-amber-900/40 text-amber-600 dark:text-amber-400 flex items-center justify-center text-2xl shadow-inner">
-                      📍
-                    </div>
-                    <div className="space-y-1">
-                      <h4 className="font-black text-sm text-slate-800 dark:text-white">📍 GPS / लोकेशन चालू करें</h4>
-                      <p className="text-xs text-slate-500 dark:text-slate-400 max-w-xs mx-auto leading-relaxed">
-                        आपके 10 KM के दायरे की मस्जिदें देखने के लिए कृपया फोन की लोकेशन (GPS) चालू करें।
-                      </p>
-                    </div>
-                    <button 
-                      type="button"
-                      onClick={() => handleFetchGpsLocation(false)} 
-                      disabled={isFetchingGps}
-                      className="inline-flex items-center gap-2 px-5 py-2.5 bg-gradient-to-r from-[#0c4033] to-[#07382c] text-white rounded-xl font-bold text-xs shadow-md active:scale-95 transition-all"
-                    >
-                      {isFetchingGps ? <span className="animate-spin text-sm">⏳</span> : <span>🔄</span>}
-                      {isFetchingGps ? 'लोकेशन खोजी जा रही है...' : 'GPS लोकेशन चालू करें'}
-                    </button>
-                  </div>
-                ) : masjidsWithin10Km.length === 0 ? (
-                  <div className={`p-6 text-center space-y-3 rounded-2xl border ${darkMode ? 'bg-slate-800 border-slate-700' : 'bg-white border-slate-200 shadow-xs'}`}>
-                    <div className="w-12 h-12 mx-auto rounded-full bg-emerald-50 dark:bg-slate-700 text-emerald-700 dark:text-emerald-300 flex items-center justify-center text-2xl shadow-inner">
-                      🕌
-                    </div>
-                    <div className="space-y-1">
-                      <h4 className="font-black text-sm text-slate-800 dark:text-white">10 KM के दायरे में कोई मस्जिद नहीं मिली</h4>
-                      <p className="text-xs text-slate-500 dark:text-slate-400 max-w-xs mx-auto leading-relaxed">
-                        आपके 10 KM के दायरे में अभी कोई मस्जिद रजिस्टर नहीं है। अपने इलाके की मस्जिद के इमाम साहब को यह ऐप शेयर करके रजिस्टर करवाएं!
-                      </p>
-                    </div>
-                    <div className="flex items-center justify-center gap-2 pt-1">
-                      <button 
-                        type="button"
-                        onClick={() => handleFetchGpsLocation(false)} 
-                        disabled={isFetchingGps}
-                        className="px-3 py-1.5 bg-emerald-100 dark:bg-slate-700 text-emerald-800 dark:text-emerald-300 rounded-xl font-bold text-xs active:scale-95 transition"
-                      >
-                        🔄 GPS रिफ्रेश
-                      </button>
-                      <button 
-                        type="button"
-                        onClick={() => {
-                          if (navigator.share) {
-                            navigator.share({ title: 'Masjid Connect', text: 'अपनी मस्जिद को ऑनलाइन कनेक्ट करने के लिए Masjid Connect ऐप इस्तेमाल करें: ', url: window.location.href }).catch(() => {});
-                          } else {
-                            navigator.clipboard.writeText(window.location.href);
-                            showToast('📋 लिंक कॉपी हो गया!');
-                          }
-                        }}
-                        className="px-3 py-1.5 bg-[#07382c] text-white rounded-xl font-bold text-xs active:scale-95 transition"
-                      >
-                        📤 शेयर करें
-                      </button>
-                    </div>
-                  </div>
-                ) : (
-                  <div className="space-y-2.5">
-                    {masjidsWithin10Km.map((m) => (
-                      <div key={m.id} onClick={() => { setSelectedMasjidId(m.id); safeStorageSet('mc_selected_masjid_id', m.id); setCurrentTab('home'); }} className={`p-2.5 rounded-2xl border cursor-pointer flex items-center gap-2.5 ${currentMasjid && currentMasjid.id === m.id ? 'border-emerald-600 bg-emerald-50/50 dark:bg-slate-800' : darkMode ? 'bg-slate-800 border-slate-700' : 'bg-white border-slate-200/80'}`}>
-                        <img src={m.photo || 'https://images.unsplash.com/photo-1542816417-0983c9c9ad53?auto=format&fit=crop&w=800&q=80'} alt={m.name} className="w-[96px] h-[96px] rounded-full object-cover border-2 border-emerald-600/40 shrink-0" />
-                        <div className="flex-1 min-w-0">
-                          <div className="flex items-center gap-1.5 flex-wrap">
-                            <h4 className="font-black text-[15px] leading-tight break-words">{m.name}</h4>
-                            {isBlueTickActive(m) && <VerifiedBadge size="sm" />}
-                          </div>
-                          <p className="text-[11px] text-slate-500 leading-snug break-words mt-0.5">{m.address}</p>
-                          {m.distanceText ? (
-                            <span className="inline-block mt-1 text-[10px] font-mono font-bold text-emerald-800 bg-emerald-100 dark:bg-emerald-950/60 dark:text-emerald-300 px-1.5 rounded">📍 {m.distanceText}</span>
-                          ) : (
-                            <span className="inline-block mt-1 text-[9.5px] font-semibold text-amber-700 dark:text-amber-400 bg-amber-50 dark:bg-amber-950/40 border border-amber-200 dark:border-amber-900/40 px-1.5 rounded">📍 लोकेशन दर्ज नहीं</span>
-                          )}
-                        </div>
-                        <div className="flex flex-col gap-[3px] shrink-0" onClick={(e) => e.stopPropagation()}>
-                          <FavButton isFav={m.isFav} onClick={() => toggleFavorite(m.id)} />
-                          <InfoButton onClick={() => openMasjidInfo(m.id, 'nearby')} />
-                          <RouteButton m={m} />
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                )}
-
-                {/* अन्य सभी मस्जिदें (10 KM से बाहर या जिनकी लोकेशन Imam ने दर्ज नहीं की - वो लिस्ट के आखिर में रहेंगी) */}
-                {allMasjidsWithDist.length > masjidsWithin10Km.length && (
-                  <div className="pt-3 border-t dark:border-slate-700 space-y-2">
-                    <div className="text-[11px] font-bold text-slate-500 dark:text-slate-400">
-                      अन्य सभी मस्जिदें ({allMasjidsWithDist.length - masjidsWithin10Km.length})
-                    </div>
-                    <div className="space-y-2">
-                      {allMasjidsWithDist.filter(m => !masjidsWithin10Km.some(w => w.id === m.id)).map((m) => (
-                        <div key={m.id} onClick={() => { setSelectedMasjidId(m.id); safeStorageSet('mc_selected_masjid_id', m.id); setCurrentTab('home'); }} className={`p-2.5 rounded-2xl border cursor-pointer flex items-center gap-2.5 ${darkMode ? 'bg-slate-800/80 border-slate-700' : 'bg-slate-50/90 border-slate-200'}`}>
-                          <img src={m.photo || 'https://images.unsplash.com/photo-1542816417-0983c9c9ad53?auto=format&fit=crop&w=800&q=80'} alt={m.name} className="w-[80px] h-[80px] rounded-full object-cover border-2 border-emerald-600/30 shrink-0" />
-                          <div className="flex-1 min-w-0">
-                            <div className="flex items-center gap-1.5 flex-wrap">
-                              <h4 className="font-black text-sm leading-tight break-words">{m.name}</h4>
-                              {isBlueTickActive(m) && <VerifiedBadge size="sm" />}
-                            </div>
-                            <p className="text-[11px] text-slate-500 leading-snug break-words mt-0.5">{m.address}</p>
-                            {m.hasValidLocation && m.distanceText ? (
-                              <span className="inline-block mt-1 text-[10px] font-mono font-bold text-slate-600 dark:text-slate-300 bg-slate-200 dark:bg-slate-700 px-1.5 rounded">📍 {m.distanceText}</span>
-                            ) : (
-                              <span className="inline-block mt-1 text-[9.5px] font-semibold text-amber-700 dark:text-amber-400 bg-amber-50 dark:bg-amber-950/40 border border-amber-200 dark:border-amber-900/40 px-1.5 rounded">📍 लोकेशन दर्ज नहीं</span>
-                            )}
-                          </div>
-                          <div className="flex flex-col gap-[3px] shrink-0" onClick={(e) => e.stopPropagation()}>
-                            <FavButton isFav={m.isFav} onClick={() => toggleFavorite(m.id)} />
-                            <InfoButton onClick={() => openMasjidInfo(m.id, 'nearby')} />
-                            {m.hasValidLocation && <RouteButton m={m} />}
-                          </div>
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-                )}
-              </main>
+            {currentTab === 'nearby' && window.NearbyTabFeature && (
+              <window.NearbyTabFeature
+                currentMasjid={currentMasjid}
+                masjids={masjids}
+                masjidsWithin10Km={masjidsWithin10Km}
+                allMasjidsWithDist={allMasjidsWithDist}
+                hasGps={hasGps}
+                isInitialSyncing={isInitialSyncing}
+                isFetchingGps={isFetchingGps}
+                darkMode={darkMode}
+                setSelectedMasjidId={setSelectedMasjidId}
+                setCurrentTab={setCurrentTab}
+                safeStorageSet={safeStorageSet}
+                handleFetchGpsLocation={handleFetchGpsLocation}
+                showToast={showToast}
+                toggleFavorite={toggleFavorite}
+                openMasjidInfo={openMasjidInfo}
+                isBlueTickActive={isBlueTickActive}
+                VerifiedBadge={VerifiedBadge}
+                FavButton={FavButton}
+                InfoButton={InfoButton}
+                RouteButton={RouteButton}
+              />
             )}
 
             {/* TAB 4: PROFILE */}
-            {currentTab === 'profile' && (
-              <main className={`px-3 py-2 flex-1 z-0 ${loggedImamMasjid ? 'pb-2 max-h-[calc(100dvh-130px)] overflow-hidden flex flex-col justify-between' : 'pb-24 space-y-4'}`}>
-                {loggedImamMasjid ? (
-                  <div className="h-full flex flex-col justify-between gap-2">
-                    {/* LIVE FOLLOWERS CARD FOR IMAM */}
-                    <div className={`${darkMode ? 'bg-slate-800 border-slate-700' : 'bg-gradient-to-r from-[#0c4033] to-[#07382c] border-emerald-800 text-white'} p-2.5 px-3.5 rounded-2xl shadow-sm border flex items-center justify-between shrink-0`}>
-                      <div className="flex items-center gap-2.5 min-w-0">
-                        <div className="w-8 h-8 rounded-xl bg-amber-400/20 border border-amber-300/40 flex items-center justify-center text-base shrink-0 shadow-inner">
-                          ⭐
-                        </div>
-                        <div className="min-w-0">
-                          <div className="flex items-center gap-1.5 flex-wrap">
-                            <span className="text-xs font-black tracking-wide text-amber-300">Live Followers</span>
-                            {isBlueTickActive(loggedImamMasjid) ? (
-                              <VerifiedBadge size="sm" />
-                            ) : (
-                              <button
-                                type="button"
-                                onClick={() => openPremiumPaywallModal(loggedImamMasjid, 'blueTick')}
-                                className="inline-flex items-center gap-1 bg-amber-500/20 hover:bg-amber-500/30 text-amber-200 text-[9px] px-2 py-0.5 rounded-full font-bold border border-amber-400/40 cursor-pointer active:scale-95 transition"
-                                title="ब्लू टिक अनलॉक करने के लिए क्लिक करें"
-                              >
-                                <span>🔵</span>
-                                <span>ब्लू टिक 🔒</span>
-                              </button>
-                            )}
-                            <span className="inline-flex items-center gap-1 bg-emerald-500/30 text-emerald-300 text-[8.5px] px-1.5 py-0.5 rounded-full font-black border border-emerald-400/30">
-                              <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-ping"></span>
-                              LIVE
-                            </span>
-                          </div>
-                          <p className="text-[10.5px] text-white/90 truncate">
-                            {(loggedImamMasjid.followersCount ?? loggedImamMasjid.favoritesCount ?? (favorites.includes(loggedImamMasjid.id) ? 1 : 0))} Muqtadi Starred this Masjid
-                          </p>
-                        </div>
-                      </div>
-                      <div className="text-right shrink-0 pl-2">
-                        <span className="text-xl font-mono font-black text-amber-300 block leading-none">
-                          {(loggedImamMasjid.followersCount ?? loggedImamMasjid.favoritesCount ?? (favorites.includes(loggedImamMasjid.id) ? 1 : 0))}
-                        </span>
-                        <span className="text-[8.5px] font-bold text-emerald-200 block mt-0.5 uppercase tracking-wider">Muqtadi</span>
-                      </div>
-                    </div>
-
-                    {/* LOCK NOTICE BANNER IF PROFILE SERVICES ARE LOCKED */}
-                    {!isProfileServicesActive(loggedImamMasjid) && (
-                      <div 
-                        onClick={() => openPremiumPaywallModal(loggedImamMasjid, 'profileServices')}
-                        className="p-2.5 rounded-2xl bg-amber-500/15 border border-amber-400/60 hover:bg-amber-500/25 text-amber-900 dark:text-amber-200 flex items-center justify-between text-xs font-bold shadow-xs cursor-pointer active:scale-[0.99] transition shrink-0"
-                      >
-                        <div className="flex items-center gap-2">
-                          <span className="text-base">🔒</span>
-                          <div className="text-left">
-                            <span className="block font-black text-amber-950 dark:text-amber-100 text-[11.5px]">प्रोफ़ाइल सेवाएं लॉक हैं (Paid Service)</span>
-                            <span className="block text-[10px] text-amber-800 dark:text-amber-300 font-medium">Namaz Time, Hadith व सभी बटन चालू करने के लिए अनलॉक करें</span>
-                          </div>
-                        </div>
-                        <span className="px-2.5 py-1 rounded-xl bg-gradient-to-r from-amber-500 to-amber-600 text-slate-950 font-black text-[11px] shadow-xs shrink-0">
-                          अनलॉक 💳
-                        </span>
-                      </div>
-                    )}
-
-                    {/* WHITE CONTAINER: 2-COLUMN GRID OF 8 COMPACT MOBILE ACTION BUTTONS (NO ICONS) */}
-                    <div className={`${darkMode ? 'bg-slate-800 border-slate-700' : 'bg-white border-slate-200'} p-3 rounded-2xl shadow-sm border shrink-0`}>
-                      <div className="grid grid-cols-2 gap-2">
-                        {/* Row 1: Namaz Time, Hadith */}
-                        <button
-                          type="button"
-                          onClick={() => {
-                            if (!isProfileServicesActive(loggedImamMasjid)) {
-                              openPremiumPaywallModal(loggedImamMasjid, 'profileServices');
-                              return;
-                            }
-                            openEditTimeModal(loggedImamMasjid);
-                          }}
-                          className="py-2.5 px-2 rounded-xl bg-[#eaf5ed] hover:bg-[#d8eedf] active:bg-[#cbe6d4] dark:bg-emerald-950/40 dark:hover:bg-emerald-900/50 border border-emerald-200 dark:border-emerald-800/70 flex items-center justify-center gap-1 text-center text-[#07382c] dark:text-emerald-200 font-bold text-xs sm:text-[13px] shadow-xs active:scale-95 transition min-h-[38px]"
-                        >
-                          <span>Namaz Time</span>
-                          {!isProfileServicesActive(loggedImamMasjid) && <span className="text-[10px] text-amber-600 dark:text-amber-400 font-bold">🔒</span>}
-                        </button>
-                        <button
-                          type="button"
-                          onClick={() => {
-                            if (!isProfileServicesActive(loggedImamMasjid)) {
-                              openPremiumPaywallModal(loggedImamMasjid, 'profileServices');
-                              return;
-                            }
-                            setEditHadithText(loggedImamMasjid.dailyHadith || '');
-                            setEditHadithRef(loggedImamMasjid.dailyHadithRef || '');
-                            setShowEditHadithModal(true);
-                          }}
-                          className="py-2.5 px-2 rounded-xl bg-[#eaf5ed] hover:bg-[#d8eedf] active:bg-[#cbe6d4] dark:bg-emerald-950/40 dark:hover:bg-emerald-900/50 border border-emerald-200 dark:border-emerald-800/70 flex items-center justify-center gap-1 text-center text-[#07382c] dark:text-emerald-200 font-bold text-xs sm:text-[13px] shadow-xs active:scale-95 transition min-h-[38px]"
-                        >
-                          <span>Hadith</span>
-                          {!isProfileServicesActive(loggedImamMasjid) && <span className="text-[10px] text-amber-600 dark:text-amber-400 font-bold">🔒</span>}
-                        </button>
-
-                        {/* Row 2: Sehri / Iftar, Notice */}
-                        <button
-                          type="button"
-                          onClick={() => {
-                            if (!isProfileServicesActive(loggedImamMasjid)) {
-                              openPremiumPaywallModal(loggedImamMasjid, 'profileServices');
-                              return;
-                            }
-                            openRamzanEdit();
-                          }}
-                          className="py-2.5 px-2 rounded-xl bg-[#eaf5ed] hover:bg-[#d8eedf] active:bg-[#cbe6d4] dark:bg-emerald-950/40 dark:hover:bg-emerald-900/50 border border-emerald-200 dark:border-emerald-800/70 flex items-center justify-center gap-1 text-center text-[#07382c] dark:text-emerald-200 font-bold text-xs sm:text-[13px] shadow-xs active:scale-95 transition min-h-[38px]"
-                        >
-                          <span>Sehri / Iftar</span>
-                          {!isProfileServicesActive(loggedImamMasjid) && <span className="text-[10px] text-amber-600 dark:text-amber-400 font-bold">🔒</span>}
-                        </button>
-                        <button
-                          type="button"
-                          onClick={() => {
-                            if (!isProfileServicesActive(loggedImamMasjid)) {
-                              openPremiumPaywallModal(loggedImamMasjid, 'profileServices');
-                              return;
-                            }
-                            setShowNewNoticeModal(true);
-                          }}
-                          className="py-2.5 px-2 rounded-xl bg-[#eaf5ed] hover:bg-[#d8eedf] active:bg-[#cbe6d4] dark:bg-emerald-950/40 dark:hover:bg-emerald-900/50 border border-emerald-200 dark:border-emerald-800/70 flex items-center justify-center gap-1 text-center text-[#07382c] dark:text-emerald-200 font-bold text-xs sm:text-[13px] shadow-xs active:scale-95 transition min-h-[38px]"
-                        >
-                          <span>Notice</span>
-                          {!isProfileServicesActive(loggedImamMasjid) && <span className="text-[10px] text-amber-600 dark:text-amber-400 font-bold">🔒</span>}
-                        </button>
-
-                        {/* Row 3: About Masjid, Edit Profile */}
-                        <button
-                          type="button"
-                          onClick={() => {
-                            if (!isProfileServicesActive(loggedImamMasjid)) {
-                              openPremiumPaywallModal(loggedImamMasjid, 'profileServices');
-                              return;
-                            }
-                            openInfoEdit();
-                          }}
-                          className="py-2.5 px-2 rounded-xl bg-[#eaf5ed] hover:bg-[#d8eedf] active:bg-[#cbe6d4] dark:bg-emerald-950/40 dark:hover:bg-emerald-900/50 border border-emerald-200 dark:border-emerald-800/70 flex items-center justify-center gap-1 text-center text-[#07382c] dark:text-emerald-200 font-bold text-xs sm:text-[13px] shadow-xs active:scale-95 transition min-h-[38px]"
-                        >
-                          <span>About Masjid</span>
-                          {!isProfileServicesActive(loggedImamMasjid) && <span className="text-[10px] text-amber-600 dark:text-amber-400 font-bold">🔒</span>}
-                        </button>
-                        <button
-                          type="button"
-                          onClick={() => {
-                            if (!isProfileServicesActive(loggedImamMasjid)) {
-                              openPremiumPaywallModal(loggedImamMasjid, 'profileServices');
-                              return;
-                            }
-                            setEditPhotoUrl(loggedImamMasjid.photo);
-                            setEditLat(parseFloat(loggedImamMasjid.lat) || 28.6139);
-                            setEditLng(parseFloat(loggedImamMasjid.lng) || 77.2090);
-                            setShowEditProfileModal(true);
-                          }}
-                          className="py-2.5 px-2 rounded-xl bg-[#eaf5ed] hover:bg-[#d8eedf] active:bg-[#cbe6d4] dark:bg-emerald-950/40 dark:hover:bg-emerald-900/50 border border-emerald-200 dark:border-emerald-800/70 flex items-center justify-center gap-1 text-center text-[#07382c] dark:text-emerald-200 font-bold text-xs sm:text-[13px] shadow-xs active:scale-95 transition min-h-[38px]"
-                        >
-                          <span>Edit Profile</span>
-                          {!isProfileServicesActive(loggedImamMasjid) && <span className="text-[10px] text-amber-600 dark:text-amber-400 font-bold">🔒</span>}
-                        </button>
-
-                        {/* Row 4: Logout, Delete Profile */}
-                        <button
-                          type="button"
-                          onClick={handleImamLogout}
-                          className="py-2.5 px-2 rounded-xl bg-[#eaf5ed] hover:bg-[#d8eedf] active:bg-[#cbe6d4] dark:bg-emerald-950/40 dark:hover:bg-emerald-900/50 border border-emerald-200 dark:border-emerald-800/70 flex items-center justify-center text-center text-[#07382c] dark:text-emerald-200 font-bold text-xs sm:text-[13px] shadow-xs active:scale-95 transition min-h-[38px]"
-                        >
-                          <span>Logout</span>
-                        </button>
-                        <button
-                          type="button"
-                          onClick={() => {
-                            if (!isProfileServicesActive(loggedImamMasjid)) {
-                              openPremiumPaywallModal(loggedImamMasjid, 'profileServices');
-                              return;
-                            }
-                            setDeletePasswordInput('');
-                            setShowDeleteSafetyModal(true);
-                          }}
-                          className="py-2.5 px-2 rounded-xl bg-[#eaf5ed] hover:bg-rose-50 active:bg-rose-100 dark:bg-emerald-950/40 dark:hover:bg-rose-950/40 border border-emerald-200 dark:border-emerald-800/70 hover:border-rose-300 dark:hover:border-rose-800 flex items-center justify-center gap-1 text-center text-[#07382c] dark:text-emerald-200 hover:text-rose-700 dark:hover:text-rose-400 font-bold text-xs sm:text-[13px] shadow-xs active:scale-95 transition min-h-[38px]"
-                        >
-                          <span>Delete Profile</span>
-                          {!isProfileServicesActive(loggedImamMasjid) && <span className="text-[10px] text-amber-600 dark:text-amber-400 font-bold">🔒</span>}
-                        </button>
-                      </div>
-                    </div>
-
-                    {/* COMPACT GLOWING CIRCULAR LIVE AZAN BUTTON (NO EXTRA SCROLL, FITS CLEANLY) */}
-                    <div className="flex flex-col items-center justify-center py-1.5 relative shrink-0">
-                      <button
-                        type="button"
-                        onClick={() => {
-                          if (isImamLive) {
-                            handleStopLiveAzan(loggedImamMasjid.id);
-                          } else {
-                            if (!isLiveAzanServiceActive(loggedImamMasjid)) {
-                              openPremiumPaywallModal(loggedImamMasjid, 'liveAzan');
-                              return;
-                            }
-                            handleStartLiveAzan(loggedImamMasjid.id);
-                          }
-                        }}
-                        className={`w-28 h-28 sm:w-32 sm:h-32 rounded-full flex flex-col items-center justify-center text-white font-extrabold shadow-2xl active:scale-95 transition-all duration-300 relative cursor-pointer ${
-                          isImamLive
-                            ? 'bg-rose-700 ring-6 ring-rose-400/50 shadow-rose-600/60 animate-pulse'
-                            : 'bg-[#d61818] ring-6 ring-rose-200/70 dark:ring-rose-900/40 shadow-rose-500/40 hover:bg-[#b91212]'
-                        }`}
-                      >
-                        <div className="text-xl font-black mb-0.5 tracking-widest flex items-center gap-1">
-                          <span className="text-base">((</span>
-                          <span className="w-2.5 h-2.5 rounded-full bg-white inline-block"></span>
-                          <span className="text-base">))</span>
-                        </div>
-                        <span className="text-[11px] font-black tracking-wide leading-tight text-center px-2">
-                          {isImamLive ? 'Stop Live Azan' : (!isLiveAzanServiceActive(loggedImamMasjid) ? 'Live Azan 🔒 (Unlock)' : 'Start Live Azan')}
-                        </span>
-                      </button>
-                    </div>
-
-                    {/* 7-DAY EXPIRY RENEWAL NOTIFICATION - ONLY VISIBLE 7 DAYS BEFORE EXPIRY TO LOGGED-IN IMAM */}
-                    {(() => {
-                      const m = loggedImamMasjid;
-                      if (!m) return null;
-                      const isExp = m.paymentStatus === 'expired';
-                      let daysLeft = null;
-                      if (m.paymentExpiry) {
-                        const expDate = new Date(m.paymentExpiry + 'T23:59:59').getTime();
-                        if (!isNaN(expDate)) {
-                          const diff = expDate - Date.now();
-                          daysLeft = Math.ceil(diff / (1000 * 60 * 60 * 24));
-                        }
-                      }
-                      // Show only if expired or 7 days or less remaining
-                      const showCountdown = isExp || (daysLeft !== null && daysLeft <= 7);
-                      if (!showCountdown) return null; // Clean empty space when > 7 days or renewed!
-
-                      return (
-                        <div className="mt-2.5 max-w-sm mx-auto w-full p-3 rounded-2xl bg-amber-50 dark:bg-amber-950/40 border border-amber-300 dark:border-amber-800 text-center space-y-1.5 shadow-xs animate-in fade-in">
-                          <div className="flex items-center justify-center gap-1.5 text-xs font-black text-amber-900 dark:text-amber-200">
-                            <span>⏳</span>
-                            <span>{isExp ? 'प्रीमियम सदस्यता समाप्त (Expired)' : `${daysLeft > 0 ? daysLeft : 0} दिन शेष • अपनी प्रीमियम सदस्यता जारी रखें`}</span>
-                          </div>
-                          <p className="text-[11px] text-amber-800 dark:text-amber-300 leading-snug font-medium">
-                            समय रहते Renewal करवाएँ, ताकि आपकी मस्जिद का ब्लू टिक व सेवाएं बाक़ी रहें।
-                          </p>
-                          <button
-                            type="button"
-                            onClick={() => openPremiumPaywallModal(m)}
-                            className="w-full py-2 bg-gradient-to-r from-[#0c4033] to-[#07382c] hover:from-[#092e24] hover:to-[#05281e] text-white rounded-xl text-xs font-black shadow active:scale-95 transition flex items-center justify-center gap-1.5"
-                          >
-                            <span>💳</span>
-                            <span>₹{adminSupport.premiumFeeAmount || 499} Renewal करें (पेमेंट डिटेल्स भरें) →</span>
-                          </button>
-                        </div>
-                      );
-                    })()}
-                  </div>
-                ) : (
-                  <div className={`${darkMode ? 'bg-slate-800 border-slate-700' : 'bg-white border-slate-200'} p-5 rounded-3xl shadow-sm border space-y-4`}>
-                    <div className="text-center pb-1"><div className="w-14 h-14 rounded-full bg-emerald-50 dark:bg-slate-700 text-emerald-800 dark:text-emerald-300 text-3xl mx-auto flex justify-center items-center">👳</div><h3 className="font-black text-sm mt-2">Imam Login</h3></div>
-                    <form onSubmit={(e) => { e.preventDefault(); handleExecuteImamLogin(loginMasjidId, loginPasscode); }} className="space-y-3 text-xs">
-                      <div><input type="text" value={loginMasjidId} onChange={(e) => { setLoginMasjidId(e.target.value); setLoginError(false); }} placeholder="Mosque ID (e.g. MASJID-101) *" required className="w-full p-2.5 border rounded-2xl uppercase font-bold dark:bg-slate-700 dark:border-slate-600" /></div>
-                      <div><input type="password" value={loginPasscode} onChange={(e) => { setLoginPasscode(e.target.value); setLoginError(false); }} placeholder="Password (e.g. 786) *" required className="w-full p-2.5 border rounded-2xl font-bold dark:bg-slate-700 dark:border-slate-600" /></div>
-                      {loginError && <div className="p-2 bg-rose-50 dark:bg-rose-900/30 border border-rose-200 dark:border-rose-800 rounded-xl text-rose-700 dark:text-rose-400 font-bold"><p>⚠️ Invalid Mosque ID or Password!</p><button type="button" onClick={() => setShowForgotCredentialsModal(true)} className="underline text-[11px] mt-1">👉 Find ID or Reset Password</button></div>}
-                      <button type="submit" className="w-full py-3 bg-[#07382c] text-white font-extrabold rounded-2xl text-xs">🔐 Login</button>
-                      <div className="text-center pt-1"><button type="button" onClick={() => setShowForgotCredentialsModal(true)} className="text-emerald-700 dark:text-emerald-400 font-extrabold text-[11px] underline">🔑 Forgot Mosque ID or Password?</button></div>
-                    </form>
-                    <div className="pt-2 border-t dark:border-slate-700 text-center space-y-2">
-                      <p className="text-[11px] text-slate-500">Is your mosque not registered yet?</p>
-                      <button type="button" onClick={() => setShowRegisterModal(true)} className="w-full py-2.5 bg-emerald-50 dark:bg-slate-700 text-emerald-800 dark:text-emerald-300 font-bold rounded-2xl border border-emerald-200 dark:border-slate-600">➕ Register New Mosque</button>
-                    </div>
-                  </div>
-                )}
-              </main>
+            {currentTab === 'profile' && window.ImamProfileFeature && (
+              <window.ImamProfileFeature
+                loggedImamMasjid={loggedImamMasjid}
+                favorites={favorites}
+                darkMode={darkMode}
+                isImamLive={isImamLive}
+                adminSupport={adminSupport}
+                loginMasjidId={loginMasjidId}
+                setLoginMasjidId={setLoginMasjidId}
+                loginPasscode={loginPasscode}
+                setLoginPasscode={setLoginPasscode}
+                loginError={loginError}
+                setLoginError={setLoginError}
+                smartRamadan={smartRamadan}
+                isBlueTickActive={isBlueTickActive}
+                isProfileServicesActive={isProfileServicesActive}
+                isLiveAzanServiceActive={isLiveAzanServiceActive}
+                openPremiumPaywallModal={openPremiumPaywallModal}
+                openEditTimeModal={openEditTimeModal}
+                setEditHadithText={setEditHadithText}
+                setEditHadithRef={setEditHadithRef}
+                setShowEditHadithModal={setShowEditHadithModal}
+                openRamzanEdit={openRamzanEdit}
+                setShowNewNoticeModal={setShowNewNoticeModal}
+                openInfoEdit={openInfoEdit}
+                setEditPhotoUrl={setEditPhotoUrl}
+                setEditLat={setEditLat}
+                setEditLng={setEditLng}
+                setShowEditProfileModal={setShowEditProfileModal}
+                handleImamLogout={handleImamLogout}
+                setDeletePasswordInput={setDeletePasswordInput}
+                setShowDeleteSafetyModal={setShowDeleteSafetyModal}
+                handleStopLiveAzan={handleStopLiveAzan}
+                handleStartLiveAzan={handleStartLiveAzan}
+                handleExecuteImamLogin={handleExecuteImamLogin}
+                setShowForgotCredentialsModal={setShowForgotCredentialsModal}
+                setShowRegisterModal={setShowRegisterModal}
+                VerifiedBadge={VerifiedBadge}
+              />
             )}
 
             {/* ================= JANKARI (ABOUT MASJID) PAGE ================= */}
@@ -3163,7 +2716,10 @@
                 VerifiedBadge,
                 safeStorageGet,
                 safeStorageSet,
-                showToast
+                showToast,
+                smartRamadan,
+                loggedImamMasjidId,
+                onOpenRamzanEdit: openRamzanEdit
               });
             })()}
             {/* ================= ABOUT APP ================= */}
@@ -3357,6 +2913,58 @@
                   </div>
 
                   <form onSubmit={handleSaveRamzan} className="space-y-3 pt-3 flex-1 flex flex-col overflow-hidden text-xs">
+                    {/* MOON CONFIRMATION CARD */}
+                    <div className={`p-3 rounded-2xl border space-y-2 shrink-0 ${ramzanDraft.moonConfirmed ? 'bg-emerald-50 dark:bg-emerald-950/40 border-emerald-400 dark:border-emerald-700' : 'bg-amber-50 dark:bg-amber-950/30 border-amber-300 dark:border-amber-800'}`}>
+                      <div className="flex items-center justify-between gap-2">
+                        <div className="min-w-0">
+                          <span className="font-black text-xs text-slate-900 dark:text-white block">
+                            {ramzanDraft.moonConfirmed ? '✅ रमज़ान का चाँद कन्फर्म है' : '🌙 रमज़ान चाँद कन्फर्मेशन'}
+                          </span>
+                          <span className="text-[10px] text-slate-600 dark:text-slate-300 block leading-snug">
+                            {ramzanDraft.moonConfirmed ? 'पक्का कैलेंडर और होम पेज काउंटडाउन चालू है' : 'चाँद दिखने पर कन्फर्म दबाएं, वरना संभावित दिखेगा'}
+                          </span>
+                        </div>
+                        <button
+                          type="button"
+                          onClick={() => setRamzanDraft(p => ({ ...p, moonConfirmed: !p.moonConfirmed }))}
+                          className={`px-3 py-1.5 rounded-xl font-black text-[11px] shadow-xs active:scale-95 transition shrink-0 ${
+                            ramzanDraft.moonConfirmed
+                              ? 'bg-emerald-700 text-white'
+                              : 'bg-amber-500 text-slate-950'
+                          }`}
+                        >
+                          {ramzanDraft.moonConfirmed ? '✓ कन्फर्म (बदलें)' : '🌙 चाँद कन्फर्म करें'}
+                        </button>
+                      </div>
+                      {!ramzanDraft.moonConfirmed && (
+                        <div className="flex gap-1.5 pt-0.5">
+                          <button
+                            type="button"
+                            onClick={() => {
+                              const t = new Date();
+                              const tomorrowIso = toLocalIso(new Date(t.getFullYear(), t.getMonth(), t.getDate() + 1));
+                              handleStartDateChange(tomorrowIso);
+                              setRamzanDraft(p => ({ ...p, moonConfirmed: true }));
+                            }}
+                            className="flex-1 py-1.5 px-2 rounded-lg bg-[#07382c] text-amber-300 font-bold text-[10.5px] active:scale-95 transition"
+                          >
+                            🌙 आज चाँद दिखा (कल से 1st रोज़ा)
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => {
+                              const todayIso = toLocalIso(new Date());
+                              handleStartDateChange(todayIso);
+                              setRamzanDraft(p => ({ ...p, moonConfirmed: true }));
+                            }}
+                            className="flex-1 py-1.5 px-2 rounded-lg bg-white dark:bg-slate-800 border border-emerald-400 text-emerald-800 dark:text-emerald-300 font-bold text-[10.5px] active:scale-95 transition"
+                          >
+                            📅 आज से 1st रोज़ा
+                          </button>
+                        </div>
+                      )}
+                    </div>
+
                     {/* TOP SETUP CARD: START DATE & BASE TIMINGS */}
                     <div className="p-3 rounded-2xl bg-slate-50 dark:bg-slate-700/60 border border-slate-200 dark:border-slate-600 space-y-2 shrink-0">
                       <div className="flex items-center justify-between gap-2">
@@ -3392,6 +3000,16 @@
                           />
                         </div>
                       </div>
+                      <button
+                        type="button"
+                        onClick={() => setRamzanDraft(p => ({
+                          ...p,
+                          days: build30DaysTimetable(p.startDate, p.sehri || '04:45', p.iftar || '17:50', true)
+                        }))}
+                        className="w-full py-1.5 rounded-xl bg-emerald-100 hover:bg-emerald-200 dark:bg-emerald-900/50 text-emerald-900 dark:text-emerald-200 font-extrabold text-[10.5px] active:scale-95 transition"
+                      >
+                        🔄 ऊपर दिए समय से पूरे 30 दिन की टेबल ऑटो-भरें
+                      </button>
                     </div>
 
                     {/* 30-DAY EDITABLE ROWS */}
@@ -4114,6 +3732,16 @@
                       <div><input value={editHijriDate} onChange={(e) => setEditHijriDate(e.target.value)} placeholder="Hijri Date (e.g. 23 Jumada al-Awwal 1448)" className="w-full p-2 border rounded-xl font-bold dark:bg-slate-700 dark:border-slate-600" required /></div>
                     </div>
                     <div className="space-y-1.5">
+                      <div className="flex justify-between items-center p-2 rounded-xl border bg-indigo-50 dark:bg-indigo-950/30 border-indigo-200 dark:border-indigo-800/60">
+                        <div>
+                          <span className="font-extrabold text-xs text-indigo-950 dark:text-indigo-200 block">🌙 Khatm-e-Sehri</span>
+                          <span className="text-[9.5px] text-indigo-700 dark:text-indigo-400">सहरी ख़त्म (फज्र अज़ान से पहले)</span>
+                        </div>
+                        <div className="flex items-center gap-1">
+                          <span className="text-xs">🕒</span>
+                          <input type="time" value={editSchedule.khatmSehri || ''} onChange={(e) => setEditSchedule({ ...editSchedule, khatmSehri: e.target.value })} className="p-1 border rounded-lg w-24 dark:bg-slate-800 dark:border-slate-700 font-bold text-indigo-950 dark:text-indigo-200" required />
+                        </div>
+                      </div>
                       {[{ key: 'fajr', label: 'Fajr', jamatKey: 'fajrJamat' },{ key: 'zuhr', label: 'Zuhr', jamatKey: 'zuhrJamat' },{ key: 'asr', label: 'Asr', jamatKey: 'asrJamat' },{ key: 'maghrib', label: 'Maghrib', jamatKey: 'maghribJamat' },{ key: 'isha', label: 'Isha', jamatKey: 'ishaJamat' }].map((p) => (
                         <div key={p.key} className="flex justify-between items-center p-2 rounded-xl border bg-slate-50 dark:bg-slate-700 dark:border-slate-600">
                           <span className="font-extrabold w-14 text-xs">{p.label}</span>
