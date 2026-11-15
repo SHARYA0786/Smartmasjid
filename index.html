@@ -6,7 +6,7 @@
     <title>Masjid Connect - Smart Islamic Mosque & Live Azan Network</title>
     <meta name="theme-color" content="#0c4033">
     <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🕌</text></svg>">
-    <link rel="preconnect" href="https://unpkg.com" crossorigin>
+    <link rel="preconnect" href="https://cdnjs.cloudflare.com" crossorigin>
     <link rel="preconnect" href="https://www.gstatic.com" crossorigin>
     <link rel="preconnect" href="https://cdn.jsdelivr.net" crossorigin>
     <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -26,17 +26,13 @@
       @keyframes mc-spin { to { transform: rotate(360deg); } }
     </style>
 
-    <!-- Non-blocking Fonts & Map CSS -->
+    <!-- Non-blocking Fonts & Map CSS (ZERO unpkg!) -->
     <link href="https://fonts.googleapis.com/css2?family=Noto+Nastaliq+Urdu:wght@400;600;700&family=Amiri:wght@400;700&family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=Rozha+One&display=swap" rel="stylesheet" media="print" onload="this.media='all'">
-    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" media="print" onload="this.media='all'">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/leaflet@1.9.4/dist/leaflet.css" media="print" onload="this.media='all'">
 
-    <!-- External Libraries (Parallel Download + Ordered Defer Execution) -->
-    <script defer src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
-    <script defer src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
-    <script defer src="https://www.gstatic.com/firebasejs/10.12.0/firebase-app-compat.js"></script>
-    <script defer src="https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore-compat.js"></script>
-    <script defer src="https://cdn.jsdelivr.net/npm/mqtt@5.16.1/dist/mqtt.min.js"></script>
-    <script defer src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+    <!-- ONLY Essential UI Runtime (Fast Cloudflare India Edge - ~45KB gzipped, ZERO unpkg/heavy blockers!) -->
+    <script defer src="https://cdnjs.cloudflare.com/ajax/libs/react/18.3.1/umd/react.production.min.js"></script>
+    <script defer src="https://cdnjs.cloudflare.com/ajax/libs/react-dom/18.3.1/umd/react-dom.production.min.js"></script>
 
     <!-- App Features & Modules (Pre-compiled Pure JS - ZERO Babel Delay!) -->
     <script defer src="./features/tasbih.js"></script>
@@ -47,6 +43,32 @@
     <script defer src="./home-nearby.js"></script>
     <script defer src="./imam-profile.js"></script>
     <script defer src="./core.js"></script>
+
+    <!-- Background Non-Blocking Loader for Firebase, MQTT Audio & Leaflet Map AFTER Home Renders -->
+    <script>
+      window.addEventListener('DOMContentLoaded', function() {
+        function loadJs(src, cb) {
+          var s = document.createElement('script');
+          s.src = src;
+          s.async = true;
+          if (cb) s.onload = cb;
+          document.head.appendChild(s);
+        }
+        setTimeout(function() {
+          loadJs('https://www.gstatic.com/firebasejs/10.12.0/firebase-app-compat.js', function() {
+            loadJs('https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore-compat.js', function() {
+              if (window.__mcOnFirebaseReady) window.__mcOnFirebaseReady();
+            });
+          });
+          loadJs('https://cdn.jsdelivr.net/npm/mqtt@5.16.1/dist/mqtt.min.js', function() {
+            if (window.__mcOnMqttReady) window.__mcOnMqttReady();
+          });
+          loadJs('https://cdn.jsdelivr.net/npm/leaflet@1.9.4/dist/leaflet.js', function() {
+            try { window.dispatchEvent(new Event('mc-leaflet-ready')); } catch(e) {}
+          });
+        }, 0);
+      });
+    </script>
 </head>
 <body class="bg-[#f0f4f1] text-slate-800 antialiased min-h-screen">
     <div id="root">
