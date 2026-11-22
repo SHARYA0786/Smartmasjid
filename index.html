@@ -47,6 +47,16 @@
     <!-- Background Non-Blocking Loader for Firebase, MQTT Audio & Leaflet Map AFTER Home Renders -->
     <script>
       window.addEventListener('DOMContentLoaded', function() {
+        if ('serviceWorker' in navigator) {
+          try { navigator.serviceWorker.register('./sw.js').catch(function() {}); } catch(e) {}
+        }
+        function showOfflineFallback() {
+          var rootEl = document.getElementById('root');
+          if (!rootEl || (typeof React !== 'undefined' && typeof ReactDOM !== 'undefined')) return;
+          rootEl.innerHTML = '<div style="max-width:28rem;margin:0 auto;min-height:100vh;background:#eef4f0;display:flex;align-items:center;justify-content:center;padding:24px;"><div style="width:100%;max-width:340px;background:#fff;border:1px solid #d1fae5;border-radius:28px;padding:28px 22px;text-align:center;box-shadow:0 14px 36px rgba(7,56,44,0.12);"><div style="width:76px;height:76px;margin:0 auto 16px;border-radius:9999px;background:#07382c;border:3px solid #eab308;display:flex;align-items:center;justify-content:center;font-size:36px;">📡</div><div style="font-size:18px;font-weight:900;color:#07382c;margin-bottom:6px;">इंटरनेट कनेक्शन नहीं है</div><div style="font-size:13px;font-weight:700;color:#047857;margin-bottom:10px;">No Internet Connection</div><div style="font-size:13px;line-height:1.55;color:#475569;margin-bottom:20px;">कृपया अपना मोबाइल डेटा या Wi-Fi चालू करें और नीचे Retry बटन दबाएँ।</div><button type="button" onclick="window.Android&&window.Android.retryLoad?window.Android.retryLoad():window.location.reload()" style="width:100%;padding:13px 16px;border:0;border-radius:16px;background:#07382c;color:#fff;font-size:14px;font-weight:800;cursor:pointer;">🔄 दोबारा कोशिश करें (Retry)</button></div></div>';
+        }
+        if (navigator.onLine === false) { setTimeout(showOfflineFallback, 1500); }
+        setTimeout(function() { if (typeof React === 'undefined' || typeof ReactDOM === 'undefined') showOfflineFallback(); }, 6000);
         function loadJs(src, cb) {
           var s = document.createElement('script');
           s.src = src;
