@@ -68,6 +68,8 @@ self.addEventListener('fetch', (event) => {
     url.pathname.startsWith('/api/') ||
     url.pathname === '/health' ||
     url.pathname.startsWith('/admin') ||
+    url.pathname === '/app' ||
+    url.pathname.startsWith('/app/') ||
     !url.protocol.startsWith('http')
   ) {
     return;
